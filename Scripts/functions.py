@@ -1,5 +1,8 @@
 import xarray 
 import pandas as pd
+import numpy as np
+from sklearn.metrics import mean_squared_error
+import rasterio
 
 def read_and_prep_parquet(path, purpose):
     """
@@ -26,13 +29,23 @@ def read_and_prep_parquet(path, purpose):
         return X
 
 
-def convert_to_tif(data):
+def convert_to_tif(data, path_file_metadata, path_out):
     """
     Function to convert data to tif file.
     Arguments:
-        data:
+        data: new file
+        path_file_metadata: tif file with metadata matching expected output tif file
+        path_out: output tif file destination and name path
     Returns:
-        tif file
+        .tif file
     """
-    #if type data
+    with rasterio.open(path_file_metadata) as src:
+        kwargs1 = src.meta.copy()
+
+    with rasterio.open(path_out, 'w', **kwargs1) as dst:
+        dst.write_band(1, data) # numpy array or xarray   
     return
+
+
+def get_rmse(y_real, y_predicted):
+    return np.sqrt(mean_squared_error(y_real, y_predicted))   
