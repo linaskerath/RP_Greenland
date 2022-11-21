@@ -49,3 +49,27 @@ def convert_to_tif(data, path_file_metadata, path_out):
 
 def get_rmse(y_real, y_predicted):
     return np.sqrt(mean_squared_error(y_real, y_predicted))   
+
+
+def information(path_to_file):
+    """
+    Function to print raster file metadata.
+    Arguments:
+        path_to_file: path to dile
+    Returns:
+        Only prints information, no returns.
+    """
+    with rasterio.open(path_to_file) as src:
+        print('BOUNDS:')
+        print(f'    {src.bounds}')
+        print('METADATA:')
+        print(f'    {src.meta}')
+        #print(src.crs)
+
+    data = xarray.open_dataarray(path_to_file)
+    print('MORE CRS INFO:')
+    print(f'    {data.spatial_ref.crs_wkt}')
+    print('RESOLUTION:')
+    print(f'    {data.rio.resolution()}')
+    # include min, max, variables, examples..?
+    return
