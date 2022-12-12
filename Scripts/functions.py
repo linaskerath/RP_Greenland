@@ -45,6 +45,7 @@ def read_and_prep_parquet(path, purpose):
         y = df[["opt_value"]]
         return X, y
     else:
+        print(f'Nan percentage: {len(df[df["opt_value"]== -1])/ len(df)}')
         df = df.fillna(-1)  # fill values to be able to train
         X = df[
             [
