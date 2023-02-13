@@ -111,7 +111,10 @@ def make_multiclass_labels(df):
     df_multiclass = df.copy()
     df_multiclass["binned_opt_value"] = pd.cut(
         df_multiclass["opt_value"],
-        list(np.arange(0, 0.41, 0.2)) + [0.64] + list(np.arange(0.8, 2.01, 0.2)) + [8],
+        list(np.arange(0, 0.41, 0.2))
+        + [0.64]
+        + list(np.arange(0.8, 2.01, 0.2))
+        + [100],
     )
 
     buckets = list(df_multiclass["binned_opt_value"].unique())
