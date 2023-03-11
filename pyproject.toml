@@ -22,6 +22,7 @@ fastparquet = "^0.8.3"
 gemgis = "^1.0.7"
 geopandas = "^0.12.2"
 pyvista = "^0.38.2"
+astral = "^3.2"
 
 
 [tool.poetry.group.dev.dependencies]

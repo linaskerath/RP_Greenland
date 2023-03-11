@@ -41,18 +41,28 @@ def import_data(date_from:str, date_to:str, df_path:str):
     return df
 
 
-def remove_data():
+def data_prep(df, removeMaskedClouds = True):
     """
     Removes missing mw and opt data from dataframe.
     Used for training and testing, not predicting.
 
-    TBD
+    Args:
+        df (pandas.DataFrame): Full train/ test dataframe.
+
+        removeMaskedClouds (bool): True for train and test data, removes masked data from opt data. 
+                                   False for predicting data, keeps masked opt data. 
+
+    Returns:
+        pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
-    # remove -1 from mw
-    # remove nan from optical
-    # remove bare ice
+    df = df[df['mw_value'] != -1]
+    
+    if removeMaskedClouds == True:
+        df = df[df['opt_value'] != -1]
+
+    # remove bare ice?
     # check if all aggregations are num (not nan)
-    return
+    return df
 
 
 def cross_validation(df, columns, train_func, n_splits = 5, hyperparameters = None):
