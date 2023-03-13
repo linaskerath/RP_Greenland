@@ -7,9 +7,9 @@ readme = "README.md"
 packages = [{include = "rp_greenland"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.9, <3.12"
 pandas = "^1.5.0"
-xarray = "^2022.6.0"
+xarray = {extras = ["io"], version = "^2023.2.0"}
 cftime = "1.0.4.2"
 rioxarray = "^0.12.2"
 netCDF4 = "^1.6.1"
@@ -23,6 +23,13 @@ gemgis = "^1.0.7"
 geopandas = "^0.12.2"
 pyvista = "^0.38.2"
 astral = "^3.2"
+scipy = "^1.10.1"
+h5netcdf = "^1.1.0"
+pydap = "^3.2.2"
+zarr = "^2.14.2"
+fsspec = "^2023.3.0"
+cfgrib = "^0.9.10.3"
+pooch = "^1.7.0"
 
 
 [tool.poetry.group.dev.dependencies]
