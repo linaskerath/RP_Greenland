@@ -41,7 +41,7 @@ def import_data(date_from:str, date_to:str, df_path:str):
     return df
 
 
-def data_prep(df, removeMaskedClouds = True):
+def data_prep(df, removeMaskedClouds = True, removeNoMelt = True):
     """
     Removes missing mw and opt data from dataframe.
     Used for training and testing, not predicting.
@@ -52,16 +52,23 @@ def data_prep(df, removeMaskedClouds = True):
         removeMaskedClouds (bool): True for train and test data, removes masked data from opt data. 
                                    False for predicting data, keeps masked opt data. 
 
+        removeNoMelt (bool): True for train and test data, removes non-melt areas from mw data.
+                             False for predicting data, keeps non-melt areas. 
     Returns:
         pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
-    df = df[df['mw_value'] != -1]
+    df = df[df['mw_value'] != -1] # should be redundant now
     
     if removeMaskedClouds == True:
         df = df[df['opt_value'] != -1]
 
-    # remove bare ice?
-    # check if all aggregations are num (not nan)
+    if removeNoMelt == True:
+        # open file
+        # join with file
+        melt = pd.read_parquet(r"../Data/split_indexes/noMelt_indexes.parquet", index= False)
+        df = df.merge(melt, how = 'left', on = ["y",'x'])
+        df = df[df['melt'] == 1]
+
     return df
 
 
