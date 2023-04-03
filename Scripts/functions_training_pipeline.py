@@ -119,7 +119,7 @@ def data_normalization(df, feature):
         elif feature == "aspect_data":
             min, max = -1, 1
         else:
-            min, max = 1, 496.01  # TODO adapt
+            min, max = 1, 500
 
         df[feature] = (df[feature] - min) / (max - min)
 
