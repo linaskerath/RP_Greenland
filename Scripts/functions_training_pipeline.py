@@ -44,9 +44,9 @@ def import_data(date_from: str, date_to: str, df_path: str):
     return df
 
 
-def data_prep(df, removeMaskedClouds = True, removeNoMelt = True):
+def remove_data(df, removeMaskedClouds = True, removeNoMelt = True):
     """
-    Removes missing mw and opt data from dataframe.
+    Removes missing/masked mw and opt data from dataframe.
     Used for training and testing, not predicting.
 
     Args:
@@ -60,14 +60,12 @@ def data_prep(df, removeMaskedClouds = True, removeNoMelt = True):
     Returns:
         pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
-    df = df[df['mw_value'] != -1] # should be redundant now
+    # df = df[df['mw_value'] != -1] 
     
     if removeMaskedClouds == True:
         df = df[df["opt_value"] != -1]
 
     if removeNoMelt == True:
-        # open file
-        # join with file
         melt = pd.read_parquet(r"../Data/split_indexes/noMelt_indexes.parquet", index= False)
         df = df.merge(melt, how = 'left', on = ["y",'x'])
         df = df[df['melt'] == 1]
@@ -139,98 +137,6 @@ def data_normalization(df, feature):
     return df
 
 
-def cross_validation(df, columns, train_func, n_splits=5, hyperparameters=None):
-    """
-    Cross-validation with TimeSeriesSplit.
-
-    Args:
-        df (pandas.DataFrame): Full train/ test dataframe.
-
-        columns (list of strings): List of columns to be used in training.
-
-        train_func (function): Custom defined function for training and evaluating model.
-                                E.g.: model_decisionTree()
-
-        n_splits (int): Number of cv splits.
-
-        hyperparameters (dict, optional): Dictionary with hyperparameters for model.
-
-    Returns:
-        list: Two list with <n_splits> RMSE scores for train and test data.
-    """
-
-    df.sort_values(by=["date"], inplace=True)  # sort df by time
-    X = df[columns]
-    y = df[["opt_value"]]
-
-    rmse_train_list = []
-    rmse_test_list = []
-    tscv = TimeSeriesSplit(n_splits=n_splits)
-
-    for train_index, test_index in tqdm(tscv.split(X)):
-        X_train = X.iloc[train_index]
-        y_train = y.iloc[train_index]
-        X_test = X.iloc[test_index]
-        y_test = y.iloc[test_index]
-
-        y_predicted_train, y_predicted_test = train_func(
-            X_train, y_train, X_test, y_test, hyperparameters
-        )
-
-        rmse_train = get_rmse(y_train, y_predicted_train)
-        rmse_test = get_rmse(y_test, y_predicted_test)
-
-        rmse_train_list.append(rmse_train)
-        rmse_test_list.append(rmse_test)
-
-    return rmse_train_list, rmse_test_list
-
-
-def get_rmse(y_real, y_predicted):
-    """
-    Calculates RMSE score.
-
-    Args:
-        y_real (): real target values.
-
-        y_predicted (): model predicted target values.
-
-    Returns:
-        float: RMSE score.
-    """
-
-    return np.sqrt(mean_squared_error(y_real, y_predicted))
-
-
-def model_decisionTree(X_train, y_train, X_test, y_test, hyperparameters=None):
-    """
-    Trains model and predicts target values.
-
-    Args:
-        X_train (pandas.DataFrame): Dataframe with train data.
-
-        y_train (pandas.DataFrame): Dataframe with train labels, one column.
-
-        X_test (pandas.DataFrame): Dataframe with test data.
-
-        y_test (pandas.DataFrame): Dataframe with test labels, one column.
-
-        hyperparameters (dict, optional): Dictionary with model parameters.
-
-    Returns:
-        list: Two lists with predicted values for train and test set.
-    """
-
-    if hyperparameters:
-        regressor = DecisionTreeRegressor(**hyperparameters)
-    else:
-        regressor = DecisionTreeRegressor(random_state=0)
-
-    regressor.fit(X_train, y_train)
-    y_predicted_train = regressor.predict(X_train)
-    y_predicted_test = regressor.predict(X_test)
-
-    return y_predicted_train, y_predicted_test
 
 
 def model_meanBenchmark(y_train, y_test):
@@ -267,12 +173,132 @@ def model_mwBenchmark(X_test):
     return y_predicted
 
 
-def hyperparameter_tune():
-    # define grid (if grid)
-    # do cv for each??? - maybe less splits?
-    # define hyperparameters as a dictionary eg: dt_params = {'max_depth':7, 'criterion': 'squared_error'}
-    return
+#############################################
+# Model trainin class, contains CV
+#############################################
+import matplotlib.pyplot as plt
+import pickle
+
+class trainedModel:
+
+    def __init__(self, model, hyperparameters):  
+        self.model = model
+        self.hyperparameters = hyperparameters # list of dictionaries with hyperparameters
+    
+    def __kmeans_split(self, df, loop, plot = False):
+        # loop = 'inner' or 'outer'
+        kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto").fit(df[['x','y']])
+        if loop == 'inner':
+            df['inner_area'] = kmeans.labels_
+        elif loop == 'outer':
+            df['outer_area'] = kmeans.labels_
+
+        if plot == True:
+            print(df[loop+'_area'].value_counts())
+            plt.scatter(df['x'], df['y'], c=df[loop+'_area'], edgecolor='none', s = 0.05)
+            plt.show()
+        return df
+    
+    def __train_test_split(self, df, columns, split_index):
+        inner_train = df[df['inner_area'] != split_index]
+        inner_test  = df[df['inner_area'] == split_index]
+        train_X = inner_train[columns]
+        train_y = inner_train[["opt_value"]]
+        test_X = inner_test[columns]
+        test_y = inner_test[["opt_value"]] 
+        return train_X, train_y, test_X, test_y
+
+    def __inner_loop_tune_hyperparameters(self, df, columns):
+        all_inner_loops_hyperparameter_scores= []
+        for inner_split in df['inner_area'].unique():
+            inner_train_X, inner_train_y, inner_test_X, inner_test_y = self.__train_test_split(df, columns, inner_split)                
+            hyperparameter_scores = []
+            if isinstance(self.hyperparameters, list):
+                for hyperparams in self.hyperparameters:
+                    regressor = self.model(random_state=0, **hyperparams).fit(inner_train_X, inner_train_y)
+                    y_predicted_test = regressor.predict(inner_test_X)
+                    hyperparameter_scores.append(mean_squared_error(inner_test_y, y_predicted_test, squared=False))
+            else:
+                print('hyperparameters must be a list')
+            all_inner_loops_hyperparameter_scores.append(hyperparameter_scores)
+        mean_hyperparameters = np.mean(all_inner_loops_hyperparameter_scores, axis=0)
+        best_inner_hyperparameters = self.hyperparameters[np.argmax(mean_hyperparameters)]
+        return best_inner_hyperparameters
+    
+    def spatial_cv(self, df, columns):
+        rmse_list_train = []
+        rmse_list_test = []
+        r2_list_train = []
+        r2_list_test = []
+        self.best_hyperparameters = []
+        predictions_train = []
+        predictions_test = []
+        real_values_train = []
+        real_values_test = []
+        
+        df = self.__kmeans_split(df, 'outer') 
+        for outer_split in df['outer_area'].unique():
+            train = df[df['outer_area'] != outer_split]
+            train = self.__kmeans_split(train, 'inner')
+            best_hyperparam= self.__inner_loop_tune_hyperparameters(train, columns)
+            self.best_hyperparameters.append(best_hyperparam)
+            
+            train_X, train_y, test_X, test_y = self.__train_test_split(train, columns, outer_split)
+            print(f'length train_X: {len(train_X)}, length train_y: {len(train_y)}, length test_X: {len(test_X)}, length test_y: {len(test_y)}')
+            regressor = self.model(random_state=0, **best_hyperparam).fit(train_X, train_y)
+            train_y_predicted = regressor.predict(train_X)
+            test_y_predicted  = regressor.predict(test_X )
+            predictions_train.append(train_y_predicted)
+            predictions_test.append(test_y_predicted)
+            real_values_train.append(train_y)
+            real_values_test.append(test_y)
+
+            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
+            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
+            r2_list_train.append(r2_score(train_y, train_y_predicted))
+            r2_list_test.append(r2_score(test_y, test_y_predicted))
+
+        # results:
+        self.rmse_train = np.mean(rmse_list_train)
+        self.rmse_std_train = np.std(rmse_list_train)
+        self.rmse_test = np.mean(rmse_list_test)
+        self.rmse_std_test = np.std(rmse_list_test)
+        self.r2_train = np.mean(r2_list_train)
+        self.r2_std_train = np.std(r2_list_train)
+        self.r2_test = np.mean(r2_list_test)
+        self.r2_std_test = np.std(r2_list_test)
+        
+        self.outer_loop_results = {'rmse_list_train': rmse_list_train,
+                                   'rmse_list_test' : rmse_list_test,
+                                   'r2_list_train'  : r2_list_train,
+                                   'r2_list_test'   : r2_list_test}
+        
+        self.outer_loop_predictions = {'train_y_predicted': predictions_train,
+                                       'test_y_predicted' : predictions_test}
+        self.outer_loop_real_values = {'train_y': real_values_train,
+                                        'test_y' : real_values_test}
+        return
+
+    def get_results(self):
+        results = pd.DataFrame({'Metric': ['RMSE', 'RMSE_std', 'R2', 'R2_std'],
+                                'Train': [self.rmse_train, self.rmse_std_train ,self.r2_train, self.r2_std_train],
+                                'Test': [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test]})
+        print(results)
+        return 
+    
+    def get_attributes(self):
+        for attribute, value in self.__dict__.items():
+            print(attribute, '=', value)
+        return
+    
 
 
-def plot_cv_results():
-    return
+def save_object(obj, filename):
+    filename = r'../Models/' + filename + '.pkl'
+    with open(filename, 'wb') as outp:
+        pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
+
+def load_object(filename):
+    with open(filename, 'rb') as inp:
+        obj = pickle.load(inp)
+    return obj
