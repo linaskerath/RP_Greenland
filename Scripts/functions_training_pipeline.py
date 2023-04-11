@@ -4,11 +4,14 @@ This script contains all necessary functions for the training pipeline.
 
 import pandas as pd
 from tqdm import tqdm
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.tree import DecisionTreeRegressor
+#from sklearn.model_selection import TimeSeriesSplit
+#from sklearn.tree import DecisionTreeRegressor
 import numpy as np
-from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+from sklearn.cluster import KMeans
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt # to plot kmeans splits
 
 
 def import_data(date_from: str, date_to: str, df_path: str):
@@ -174,19 +177,54 @@ def model_mwBenchmark(X_test):
 
 
 #############################################
-# Model trainin class, contains CV
+# Model training class, contains CV
 #############################################
 import matplotlib.pyplot as plt
 import pickle
 
-class trainedModel:
+class Model:
+    """ 
+    This class contains models. 
+    After training it also contains performance scores and the hyperparameters used to train it.
+    """
 
-    def __init__(self, model, hyperparameters):  
+    def __init__(self, model):  
         self.model = model
-        self.hyperparameters = hyperparameters # list of dictionaries with hyperparameters
+        self.hyperparameters = [] # list of dictionaries with hyperparameters
     
+    def create_hyperparameter_grid(self, hyperparameters):
+        """
+        Creates a grid with all possible combinations of hyperparameters.
+
+        Args:
+            hyperparameters (dict): Dictionary with hyperparameters.
+
+        Returns:
+            list: List with dictionaries with all possible combinations of hyperparameters.
+        """
+        hyperparameter_grid = []
+        for i in range(len(hyperparameters)):
+            hyperparameter_grid.append(list(hyperparameters.values())[i])
+        hyperparameter_grid = list(itertools.product(*hyperparameter_grid))
+        hyperparameter_grid = [dict(zip(hyperparameters.keys(), values)) for values in hyperparameter_grid]
+        return hyperparameter_grid
+
+
     def __kmeans_split(self, df, loop, plot = False):
-        # loop = 'inner' or 'outer'
+        """ 
+        This function splits the data into 5 areas based on the kmeans algorithm.
+
+        Args:
+            df (pandas.DataFrame): Dataframe with data.
+
+            loop (str): 'inner' or 'outer' loop.
+
+            plot (bool): If True, plots the kmeans split.
+
+        Returns:
+            pandas.DataFrame: Dataframe with added column with kmeans split.
+        
+        """
         kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto").fit(df[['x','y']])
         if loop == 'inner':
             df['inner_area'] = kmeans.labels_
@@ -200,6 +238,19 @@ class trainedModel:
         return df
     
     def __train_test_split(self, df, columns, split_index):
+        """ 
+        This function splits the data into train and test set.
+
+        Args:
+            df (pandas.DataFrame): Dataframe with data.
+
+            columns (list): List with column names to be used in the model.
+
+            split_index (int): Index of the split (loop).
+
+        Returns:
+            pandas.DataFrame: Dataframe with added column with kmeans split.
+        """
         inner_train = df[df['inner_area'] != split_index]
         inner_test  = df[df['inner_area'] == split_index]
         train_X = inner_train[columns]
@@ -209,6 +260,17 @@ class trainedModel:
         return train_X, train_y, test_X, test_y
 
     def __inner_loop_tune_hyperparameters(self, df, columns):
+        """ 
+        This function performs hyperparameter tuning in (inner loop of nested cross-validation).
+        
+        Args:
+            df (pandas.DataFrame): Dataframe with data.
+
+            columns (list): List with column names to be used in the model.
+
+        Returns:
+            dict: Dictionary with best hyperparameters.
+        """
         all_inner_loops_hyperparameter_scores= []
         for inner_split in df['inner_area'].unique():
             inner_train_X, inner_train_y, inner_test_X, inner_test_y = self.__train_test_split(df, columns, inner_split)                
@@ -222,10 +284,22 @@ class trainedModel:
                 print('hyperparameters must be a list')
             all_inner_loops_hyperparameter_scores.append(hyperparameter_scores)
         mean_hyperparameters = np.mean(all_inner_loops_hyperparameter_scores, axis=0)
-        best_inner_hyperparameters = self.hyperparameters[np.argmax(mean_hyperparameters)]
+        best_inner_hyperparameters = self.hyperparameters[np.argmin(mean_hyperparameters)] # not argmax because we want to minimize the error
         return best_inner_hyperparameters
     
     def spatial_cv(self, df, columns):
+        """ 
+        This function performs spatial cross-validation.
+        
+        Args:
+            df (pandas.DataFrame): Dataframe with data.
+            
+            columns (list): List with column names to be used in the model.
+
+        Returns:
+            Nothing. But it assigns the RMSE and R2 scores for the train and test set to the model object.
+                     It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
+        """
         rmse_list_train = []
         rmse_list_test = []
         r2_list_train = []
@@ -236,10 +310,11 @@ class trainedModel:
         real_values_train = []
         real_values_test = []
         
-        df = self.__kmeans_split(df, 'outer') 
+        df = self.__kmeans_split(df, 'outer') #, plot = True #df = self.__cv_split_outer_loop(df)
         for outer_split in df['outer_area'].unique():
+            #if outer_split == 1: # remove
             train = df[df['outer_area'] != outer_split]
-            train = self.__kmeans_split(train, 'inner')
+            train = self.__kmeans_split(train, 'inner') #train = self.__cv_split_inner_loop(train)
             best_hyperparam= self.__inner_loop_tune_hyperparameters(train, columns)
             self.best_hyperparameters.append(best_hyperparam)
             
@@ -258,6 +333,8 @@ class trainedModel:
             r2_list_train.append(r2_score(train_y, train_y_predicted))
             r2_list_test.append(r2_score(test_y, test_y_predicted))
 
+            # else: # tb removed
+            #     continue
         # results:
         self.rmse_train = np.mean(rmse_list_train)
         self.rmse_std_train = np.std(rmse_list_train)
@@ -280,6 +357,9 @@ class trainedModel:
         return
 
     def get_results(self):
+        """ 
+        This function prints the results of the model in a table.
+        """
         results = pd.DataFrame({'Metric': ['RMSE', 'RMSE_std', 'R2', 'R2_std'],
                                 'Train': [self.rmse_train, self.rmse_std_train ,self.r2_train, self.r2_std_train],
                                 'Test': [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test]})
@@ -287,6 +367,9 @@ class trainedModel:
         return 
     
     def get_attributes(self):
+        """ 
+        This function prints the attributes of the model.
+        """
         for attribute, value in self.__dict__.items():
             print(attribute, '=', value)
         return
@@ -294,11 +377,30 @@ class trainedModel:
 
 
 def save_object(obj, filename):
+    """ 
+    This function saves an object to a pickle file.
+
+    Args:
+        obj (object): Object to be saved.
+
+        filename (str): Name of the file to be saved, with extension, without path unless a subfolder is desired.
+    """
     filename = r'../Models/' + filename + '.pkl'
-    with open(filename, 'wb') as outp:
+    with open(filename, 'wb') as outp:  # Overwrites any existing file.
         pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
 
+
 def load_object(filename):
+    """ 
+    This function loads an object from a pickle file.
+    
+    Args:
+        filename (str): Name of the file to be loaded, with extension, without path unless a subfolder is desired.
+        
+    Returns:
+            obj (object): Loaded object.
+    """
+    filename = r'../Models/' + filename + '.pkl'
     with open(filename, 'rb') as inp:
         obj = pickle.load(inp)
     return obj
