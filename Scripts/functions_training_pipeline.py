@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt # to plot kmeans splits
+import matplotlib.pyplot as plt  # to plot kmeans splits
 from sklearn.model_selection import ParameterGrid
 
 # import models:
@@ -25,6 +25,7 @@ from sklearn.ensemble import GradientBoostingRegressor
 #############################################
 # Data preparation functions
 #############################################
+
 
 def import_data(date_from: str, date_to: str, df_path: str):
     """
@@ -46,10 +47,9 @@ def import_data(date_from: str, date_to: str, df_path: str):
     df_list = []
 
     for melt_date in tqdm(date_range):
+        print(melt_date)
         try:  # bc some days are empty
-            file = pd.read_parquet(
-                df_path + "melt_" + melt_date + "_extended.parquet.gzip", index=False
-            )
+            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
             df_list.append(file)  # list of df
         except:
             continue
@@ -59,7 +59,7 @@ def import_data(date_from: str, date_to: str, df_path: str):
     return df
 
 
-def remove_data(df, removeMaskedClouds = True, removeNoMelt = True):
+def remove_data(df, removeMaskedClouds=True, removeNoMelt=True):
     """
     Removes missing/masked mw and opt data from dataframe.
     Used for training and testing, not predicting.
@@ -71,19 +71,19 @@ def remove_data(df, removeMaskedClouds = True, removeNoMelt = True):
                                    False for predicting data, keeps masked opt data.
 
         removeNoMelt (bool): True for train and test data, removes non-melt areas from mw data.
-                             False for predicting data, keeps non-melt areas. 
+                             False for predicting data, keeps non-melt areas.
     Returns:
         pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
-    
+
     if removeMaskedClouds == True:
         df = df[df["opt_value"] != -1]
 
     if removeNoMelt == True:
-        melt = pd.read_parquet(r"../Data/split_indexes/noMelt_indexes.parquet", index= False)
-        df = df.merge(melt, how = 'left', on = ["y",'x'])
-        df = df[df['melt'] == 1]
-        df.pop('melt')
+        melt = pd.read_parquet(r"../Data/split_indexes/noMelt_indexes.parquet")
+        df = df.merge(melt, how="left", on=["y", "x"])
+        df = df[df["melt"] == 1]
+        df.pop("melt")
     return df
 
 
@@ -107,7 +107,6 @@ def data_normalization(df, features):
         "mean_3",
         "mean_9",
         "sum_5",
-        "mw_value_yesterday",
         "mw_value_7_day_average",
         "hours_of_daylight",
         "slope_data",
@@ -115,17 +114,17 @@ def data_normalization(df, features):
         "distance_to_margin",
     ]
     zscore_features = ["opt_value", "elevation_data"]
-    
+
     for feature in features:
         if feature in minmax_features:
             if feature == "col":
                 min, max = 0, 1461
             elif feature == "row":
                 min, max = 0, 2662
-            elif feature =='x':
-                min, max = -636500.0, 824500.0 
-            elif feature =='y':
-                min, max = -3324500.0, -662500.0 
+            elif feature == "x":
+                min, max = -636500.0, 824500.0
+            elif feature == "y":
+                min, max = -3324500.0, -662500.0
             elif feature == "mean_3":
                 min, max = 0, 1
             elif feature == "mean_9":
@@ -201,32 +200,32 @@ def model_mwBenchmark(X_test):
 import matplotlib.pyplot as plt
 import pickle
 
+
 class Model:
-    """ 
-    This class contains models. 
+    """
+    This class contains models.
     After training it also contains performance scores and the hyperparameters used to train it.
     """
 
-    def __init__(self, model, name):  
+    def __init__(self, model, name):
         self.model = model
-        self.hyperparameters = [] # list of dictionaries with hyperparameters
+        self.hyperparameters = []  # list of dictionaries with hyperparameters
         self.name = name
 
     def create_hyperparameter_grid(self, hyperparameters):
         """
         This function creates a grid of hyperparameters.
-        
+
         Args:
             hyperparameters (dict): Dictionary with hyperparameters.
-            
+
         Returns:
             list: List of dictionaries with hyperparameters.
         """
         return list(ParameterGrid(hyperparameters))
 
-
-    def __kmeans_split(self, df, split_variable_name, plot = False, verbose = False):
-        """ 
+    def __kmeans_split(self, df, split_variable_name, plot=False, verbose=False):
+        """
         This function splits the data into 5 areas based on the kmeans algorithm.
 
         Args:
@@ -241,19 +240,19 @@ class Model:
         Returns:
             pandas.DataFrame: Dataframe with added column with kmeans split.
         """
-        kmeans = KMeans(n_clusters=5, n_init="auto").fit(df[['x','y']]) #  random_state=0,
+        kmeans = KMeans(n_clusters=5, n_init="auto").fit(df[["x", "y"]])  #  random_state=0,
         df[split_variable_name] = kmeans.labels_
 
         if verbose == True:
             print(df[split_variable_name].value_counts())
 
         if plot == True:
-            plt.scatter(df['x'], df['y'], c=df[split_variable_name], edgecolor='none', s = 0.05)
+            plt.scatter(df["x"], df["y"], c=df[split_variable_name], edgecolor="none", s=0.05)
             plt.show()
         return df
-    
+
     def __train_test_split(self, df, columns, split_variable_name, split_index):
-        """ 
+        """
         This function splits the data into train and test set.
 
         Args:
@@ -269,17 +268,17 @@ class Model:
             pandas.DataFrame: Dataframe with added column with kmeans split.
         """
         train = df[df[split_variable_name] != split_index]
-        test  = df[df[split_variable_name] == split_index]
+        test = df[df[split_variable_name] == split_index]
         train_X = train[columns]
         train_y = train["opt_value"].values.ravel()
         test_X = test[columns]
-        test_y = test["opt_value"].values.ravel() 
+        test_y = test["opt_value"].values.ravel()
         return train_X, train_y, test_X, test_y
 
     def __tune_hyperparameters(self, df, columns, split_variable_name):
-        """ 
+        """
         This function performs hyperparameter tuning in (inner loop of nested cross-validation).
-        
+
         Args:
             df (pandas.DataFrame): Dataframe with data.
 
@@ -290,9 +289,9 @@ class Model:
         Returns:
             dict: Dictionary with best hyperparameters.
         """
-        all_hyperparameter_scores= []
+        all_hyperparameter_scores = []
         for split in df[split_variable_name].unique():
-            train_X, train_y, test_X, test_y = self.__train_test_split(df, columns, split_variable_name, split)                
+            train_X, train_y, test_X, test_y = self.__train_test_split(df, columns, split_variable_name, split)
             one_loop_hyperparameter_scores = []
             if isinstance(self.hyperparameters, list):
                 for hyperparams in self.hyperparameters:
@@ -300,25 +299,26 @@ class Model:
                     y_predicted_test = regressor.predict(test_X)
                     one_loop_hyperparameter_scores.append(mean_squared_error(test_y, y_predicted_test, squared=False))
             else:
-                print('hyperparameters must be a list')
+                print("hyperparameters must be a list")
             all_hyperparameter_scores.append(one_loop_hyperparameter_scores)
         mean_hyperparameters = np.mean(all_hyperparameter_scores, axis=0)
-        best_hyperparameters = self.hyperparameters[np.argmin(mean_hyperparameters)] # not argmax because we want to minimize the error
+        best_hyperparameters = self.hyperparameters[
+            np.argmin(mean_hyperparameters)
+        ]  # not argmax because we want to minimize the error
         return best_hyperparameters
 
-
     def __save_dates(self, df):
-        """ 
+        """
         This function saves the dates of the train and test set.
-        
+
         Args:
             df (pandas.DataFrame): Dataframe with data.
 
         Returns:
             list of dates used in training/cv.
         """
-        return list(df['date'].unique())
-    
+        return list(df["date"].unique())
+
     def get_feature_importance(self, model, columns):
         """
         This function returns the feature importance of a model.
@@ -346,19 +346,18 @@ class Model:
         elif isinstance(model, ElasticNet):
             feature_importance = np.abs(model.coef_[0])
         else:
-            print('model not supported')
+            print("model not supported")
 
         feature_importance_dict = dict(zip(columns, feature_importance))
         return feature_importance_dict
 
-
     def spatial_cv(self, df, columns):
-        """ 
+        """
         This function performs spatial cross-validation.
-        
+
         Args:
             df (pandas.DataFrame): Dataframe with data.
-            
+
             columns (list): List with column names to be used in the model.
 
         Returns:
@@ -367,7 +366,7 @@ class Model:
         """
 
         self.dates = self.__save_dates(df)
-        #columns = list(df.columns[df.columns != 'opt_value']) # and date ( and x and Y???)
+        # columns = list(df.columns[df.columns != 'opt_value']) # and date ( and x and Y???)
 
         rmse_list_train = []
         rmse_list_test = []
@@ -375,20 +374,22 @@ class Model:
         r2_list_test = []
         self.best_hyperparameter_list = []
         self.feature_importance_list = []
-        
-        df = self.__kmeans_split(df, 'outer_area')
-        for outer_split in df['outer_area'].unique():
-            train = df[df['outer_area'] != outer_split]
-            train = self.__kmeans_split(train, 'inner_area')
-            best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name = 'inner_area')
+
+        df = self.__kmeans_split(df, "outer_area")
+        for outer_split in df["outer_area"].unique():
+            train = df[df["outer_area"] != outer_split]
+            train = self.__kmeans_split(train, "inner_area")
+            best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
             self.best_hyperparameter_list.append(best_hyperparam)
-            
-            train_X, train_y, test_X, test_y = self.__train_test_split(df, columns, split_variable_name = 'outer_area', split_index = outer_split)
+
+            train_X, train_y, test_X, test_y = self.__train_test_split(
+                df, columns, split_variable_name="outer_area", split_index=outer_split
+            )
             regressor = self.model(random_state=0, **best_hyperparam).fit(train_X, train_y)
             self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
 
             train_y_predicted = regressor.predict(train_X)
-            test_y_predicted  = regressor.predict(test_X )
+            test_y_predicted = regressor.predict(test_X)
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
@@ -404,42 +405,46 @@ class Model:
         self.r2_std_train = np.std(r2_list_train)
         self.r2_test = np.mean(r2_list_test)
         self.r2_std_test = np.std(r2_list_test)
-        
 
-        df = self.__kmeans_split(df, 'final_split_areas')
-        for split in df['final_split_areas'].unique():
-            self.final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name = 'final_split_areas')
+        df = self.__kmeans_split(df, "final_split_areas")
+        for split in df["final_split_areas"].unique():
+            self.final_hyperparameters = self.__tune_hyperparameters(
+                df, columns, split_variable_name="final_split_areas"
+            )
 
-        self.final_model = self.model(random_state=0, **self.final_hyperparameters).fit(df[columns], df['opt_value']) 
+        self.final_model = self.model(random_state=0, **self.final_hyperparameters).fit(df[columns], df["opt_value"])
         self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
-        
+
         return
 
-
-        
     def get_results(self):
-        """ 
+        """
         This function prints the results of the model in a table.
         """
-        results = pd.DataFrame({'Metric': ['RMSE', 'RMSE_std', 'R2', 'R2_std'],
-                                'Train': [self.rmse_train, self.rmse_std_train ,self.r2_train, self.r2_std_train],
-                                'Test': [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test]})
+        results = pd.DataFrame(
+            {
+                "Metric": ["RMSE", "RMSE_std", "R2", "R2_std"],
+                "Train": [self.rmse_train, self.rmse_std_train, self.r2_train, self.r2_std_train],
+                "Test": [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test],
+            }
+        )
         print(results)
-        return 
-    
+        return
+
     def get_attributes(self):
-        """ 
+        """
         This function prints the attributes of the model.
         """
         for attribute, value in self.__dict__.items():
-            print(attribute, '=', value)
+            print(attribute, "=", value)
         return
-    
+
 
 #############################################
 
+
 def save_object(obj):
-    """ 
+    """
     This function saves an object to a pickle file.
 
     Args:
@@ -447,24 +452,25 @@ def save_object(obj):
 
         filename (str): Name of the file to be saved, with extension, without path unless a subfolder is desired.
     """
-    filename = r'../Models/' + obj.name + '.pkl'
-    with open(filename, 'wb') as outp:  # Overwrites any existing file.
+    filename = r"../Models/" + obj.name + ".pkl"
+    with open(filename, "wb") as outp:  # Overwrites any existing file.
         pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
 
 
 def load_object(filename):
-    """ 
+    """
     This function loads an object from a pickle file.
-    
+
     Args:
         filename (str): Name of the file to be loaded, with extension, without path unless a subfolder is desired.
-        
+
     Returns:
             obj (object): Loaded object.
     """
-    filename = r'../Models/' + filename + '.pkl'
-    with open(filename, 'rb') as inp:
+    filename = r"../Models/" + filename + ".pkl"
+    with open(filename, "rb") as inp:
         obj = pickle.load(inp)
     return obj
+
 
 #############################################
