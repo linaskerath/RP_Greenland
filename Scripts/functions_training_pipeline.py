@@ -111,9 +111,10 @@ def data_normalization(df, features):
         "hours_of_daylight",
         "slope_data",
         "aspect_data",
+        "elevation_data",
         "distance_to_margin",
     ]
-    zscore_features = ["opt_value", "elevation_data"]
+    log_feature = ["opt_value"]
 
     for feature in features:
         if feature in minmax_features:
@@ -141,14 +142,16 @@ def data_normalization(df, features):
                 min, max = 0, 90
             elif feature == "aspect_data":
                 min, max = -1, 1
+            elif feature == "elevation_data":
+                min, max = 0, 3694
             else:
                 min, max = 1, 500
 
             df[feature] = (df[feature] - min) / (max - min)
 
-        elif feature in zscore_features:
-            scaler = StandardScaler()
-            df[feature] = scaler.fit_transform(df[[feature]])
+        elif feature in log_feature:
+            # add a constant to avoid log(0)
+            df[feature] = np.log(1 + df[feature])
         else:
             print(f"Not applicable for feature'{feature}'.")
 
