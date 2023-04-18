@@ -12,7 +12,14 @@ from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt # to plot kmeans splits
 from sklearn.model_selection import ParameterGrid
 
+# import models:
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import ElasticNet
+from sklearn.ensemble import GradientBoostingRegressor
 
 
 #############################################
@@ -68,7 +75,6 @@ def remove_data(df, removeMaskedClouds = True, removeNoMelt = True):
     Returns:
         pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
-    # df = df[df['mw_value'] != -1] 
     
     if removeMaskedClouds == True:
         df = df[df["opt_value"] != -1]
@@ -77,27 +83,27 @@ def remove_data(df, removeMaskedClouds = True, removeNoMelt = True):
         melt = pd.read_parquet(r"../Data/split_indexes/noMelt_indexes.parquet", index= False)
         df = df.merge(melt, how = 'left', on = ["y",'x'])
         df = df[df['melt'] == 1]
-
+        df.pop('melt')
     return df
 
 
-def data_normalization(df, feature):
+def data_normalization(df, features):
     """
     Normalizes data with min-max (linear) or Z-score normalization depending on feature.
 
     Args:
         df (pandas.DataFrame): Full train/ test dataframe.
 
-        feature (string): Name of feature to be normalized.
+        features (list of features): Names of features to be normalized.
 
     Returns:
-        pandas.DataFrame: The same dataframe with normalized feature.
+        pandas.DataFrame: The same dataframe with normalized features.
     """
-    # TODO add / correct opt_value and elevation_data
-
     minmax_features = [
         "col",
         "row",
+        "x",
+        "y",
         "mean_3",
         "mean_9",
         "sum_5",
@@ -109,40 +115,46 @@ def data_normalization(df, feature):
         "distance_to_margin",
     ]
     zscore_features = ["opt_value", "elevation_data"]
+    
+    for feature in features:
+        if feature in minmax_features:
+            if feature == "col":
+                min, max = 0, 1461
+            elif feature == "row":
+                min, max = 0, 2662
+            elif feature =='x':
+                min, max = -636500.0, 824500.0 
+            elif feature =='y':
+                min, max = -3324500.0, -662500.0 
+            elif feature == "mean_3":
+                min, max = 0, 1
+            elif feature == "mean_9":
+                min, max = 0, 1
+            elif feature == "sum_5":
+                min, max = 0, 25
+            elif feature == "mw_value_yesterday":
+                min, max = 0, 1
+            elif feature == "mw_value_7_day_average":
+                min, max = 0, 1
+            elif feature == "hours_of_daylight":
+                min, max = 0, 24
+            elif feature == "slope_data":
+                min, max = 0, 90
+            elif feature == "aspect_data":
+                min, max = -1, 1
+            else:
+                min, max = 1, 500
 
-    if feature in minmax_features:
-        if feature == "col":
-            min, max = 0, 1461
-        elif feature == "row":
-            min, max = 0, 2662
-        elif feature == "mean_3":
-            min, max = 0, 1
-        elif feature == "mean_9":
-            min, max = 0, 1
-        elif feature == "sum_5":
-            min, max = 0, 25
-        elif feature == "mw_value_yesterday":
-            min, max = 0, 1
-        elif feature == "mw_value_7_day_average":
-            min, max = 0, 1
-        elif feature == "hours_of_daylight":
-            min, max = 0, 24
-        elif feature == "slope_data":
-            min, max = 0, 90
-        elif feature == "aspect_data":
-            min, max = -1, 1
+            df[feature] = (df[feature] - min) / (max - min)
+
+        elif feature in zscore_features:
+            scaler = StandardScaler()
+            df[feature] = scaler.fit_transform(df[[feature]])
         else:
-            min, max = 1, 500
-
-        df[feature] = (df[feature] - min) / (max - min)
-
-    elif feature in zscore_features:
-        scaler = StandardScaler()
-        df[feature] = scaler.fit_transform(df[[feature]])
-    else:
-        print("Feature not found.")
+            print(f"Not applicable for feature'{feature}'.")
 
     return df
+
 
 #############################################
 # Benchmark functions
@@ -259,9 +271,9 @@ class Model:
         train = df[df[split_variable_name] != split_index]
         test  = df[df[split_variable_name] == split_index]
         train_X = train[columns]
-        train_y = train[["opt_value"]]
+        train_y = train["opt_value"].values.ravel()
         test_X = test[columns]
-        test_y = test[["opt_value"]] 
+        test_y = test["opt_value"].values.ravel() 
         return train_X, train_y, test_X, test_y
 
     def __tune_hyperparameters(self, df, columns, split_variable_name):
