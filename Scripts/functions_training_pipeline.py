@@ -47,7 +47,7 @@ def import_data(date_from: str, date_to: str, df_path: str):
     df_list = []
 
     for melt_date in tqdm(date_range):
-        print(melt_date)
+        #print(melt_date)
         try:  # bc some days are empty
             file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
             df_list.append(file)  # list of df
@@ -295,7 +295,7 @@ class Model:
             one_loop_hyperparameter_scores = []
             if isinstance(self.hyperparameters, list):
                 for hyperparams in self.hyperparameters:
-                    regressor = self.model(random_state=0, **hyperparams).fit(train_X, train_y)
+                    regressor = self.model(**hyperparams).fit(train_X, train_y)
                     y_predicted_test = regressor.predict(test_X)
                     one_loop_hyperparameter_scores.append(mean_squared_error(test_y, y_predicted_test, squared=False))
             else:
@@ -338,13 +338,13 @@ class Model:
         elif isinstance(model, GradientBoostingRegressor):
             feature_importance = model.feature_importances_
         elif isinstance(model, LinearRegression):
-            feature_importance = np.abs(model.coef_[0])
+            feature_importance = np.abs(model.coef_) # [0]
         elif isinstance(model, Ridge):
-            feature_importance = np.abs(model.coef_[0])
+            feature_importance = np.abs(model.coef_)
         elif isinstance(model, Lasso):
-            feature_importance = np.abs(model.coef_[0])
+            feature_importance = np.abs(model.coef_)
         elif isinstance(model, ElasticNet):
-            feature_importance = np.abs(model.coef_[0])
+            feature_importance = np.abs(model.coef_)
         else:
             print("model not supported")
 
@@ -385,7 +385,7 @@ class Model:
             train_X, train_y, test_X, test_y = self.__train_test_split(
                 df, columns, split_variable_name="outer_area", split_index=outer_split
             )
-            regressor = self.model(random_state=0, **best_hyperparam).fit(train_X, train_y)
+            regressor = self.model(**best_hyperparam).fit(train_X, train_y)
             self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
 
             train_y_predicted = regressor.predict(train_X)
@@ -412,7 +412,7 @@ class Model:
                 df, columns, split_variable_name="final_split_areas"
             )
 
-        self.final_model = self.model(random_state=0, **self.final_hyperparameters).fit(df[columns], df["opt_value"])
+        self.final_model = self.model(**self.final_hyperparameters).fit(df[columns], df["opt_value"])
         self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
         return
@@ -428,8 +428,8 @@ class Model:
                 "Test": [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test],
             }
         )
-        print(results)
-        return
+        #print(results)
+        return results
 
     def get_attributes(self):
         """
