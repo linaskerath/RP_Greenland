@@ -377,19 +377,27 @@ class Model:
         r2_list_test = []
         self.best_hyperparameter_list = []
         self.feature_importance_list = []
+        self.cv_model_list = []
 
+        # split the data into outer folds:
         df = self.__kmeans_split(df, "outer_area")
+        # for each outer fold:
         for outer_split in df["outer_area"].unique():
+            # define only train set (to be used in inner loop of nested cross-validation)
             train = df[df["outer_area"] != outer_split]
+            # split the data into inner folds:
             train = self.__kmeans_split(train, "inner_area")
+            # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
             self.best_hyperparameter_list.append(best_hyperparam)
 
+            # with the best hyperparameters, train the model on the outer fold:
             train_X, train_y, test_X, test_y = self.__train_test_split(
-                df, columns, split_variable_name="outer_area", split_index=outer_split
-            )
+                df, columns, split_variable_name="outer_area", split_index=outer_split)
             regressor = self.model(**best_hyperparam).fit(train_X, train_y)
             self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
+            # here save model
+            self.cv_model_list.append(regressor)
 
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
@@ -409,12 +417,13 @@ class Model:
         self.r2_test = np.mean(r2_list_test)
         self.r2_std_test = np.std(r2_list_test)
 
+        # find best hyperparameters in for the WHOLE dataset (instaed of only one fold at a time):
+        # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
             self.final_hyperparameters = self.__tune_hyperparameters(
-                df, columns, split_variable_name="final_split_areas"
-            )
-
+                df, columns, split_variable_name="final_split_areas")
+        # fit final model:
         self.final_model = self.model(**self.final_hyperparameters).fit(df[columns], df["opt_value"])
         self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
