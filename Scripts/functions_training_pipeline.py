@@ -368,7 +368,7 @@ class Model:
                      It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
         """
 
-        self.dates = self.__save_dates(df)
+        # self.dates = self.__save_dates(df)
         # columns = list(df.columns[df.columns != 'opt_value']) # and date ( and x and Y???)
 
         rmse_list_train = []
@@ -377,19 +377,27 @@ class Model:
         r2_list_test = []
         self.best_hyperparameter_list = []
         self.feature_importance_list = []
+        self.cv_model_list = []
 
+        # split the data into outer folds:
         df = self.__kmeans_split(df, "outer_area")
+        # for each outer fold:
         for outer_split in df["outer_area"].unique():
+            # define only train set (to be used in inner loop of nested cross-validation)
             train = df[df["outer_area"] != outer_split]
+            # split the data into inner folds:
             train = self.__kmeans_split(train, "inner_area")
+            # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
             self.best_hyperparameter_list.append(best_hyperparam)
 
+            # with the best hyperparameters, train the model on the outer fold:
             train_X, train_y, test_X, test_y = self.__train_test_split(
-                df, columns, split_variable_name="outer_area", split_index=outer_split
-            )
+                df, columns, split_variable_name="outer_area", split_index=outer_split)
             regressor = self.model(**best_hyperparam).fit(train_X, train_y)
             self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
+            # here save model
+            self.cv_model_list.append(regressor)
 
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
@@ -409,30 +417,32 @@ class Model:
         self.r2_test = np.mean(r2_list_test)
         self.r2_std_test = np.std(r2_list_test)
 
+        # find best hyperparameters in for the WHOLE dataset (instaed of only one fold at a time):
+        # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
             self.final_hyperparameters = self.__tune_hyperparameters(
-                df, columns, split_variable_name="final_split_areas"
-            )
-
+                df, columns, split_variable_name="final_split_areas")
+        # fit final model:
         self.final_model = self.model(**self.final_hyperparameters).fit(df[columns], df["opt_value"])
         self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
         return
-
+    
     def get_results(self):
         """
         This function prints the results of the model in a table.
         """
         results = pd.DataFrame(
             {
-                "Metric": ["RMSE", "RMSE_std", "R2", "R2_std"],
-                "Train": [self.rmse_train, self.rmse_std_train, self.r2_train, self.r2_std_train],
-                "Test": [self.rmse_test, self.rmse_std_test, self.r2_test, self.r2_std_test],
+                "Set": ["Train", "Test"],
+                "RMSE":[self.rmse_train, self.rmse_test],
+                "RMSE_std":[self.rmse_std_train, self.rmse_std_test],
+                "R2":[self.r2_train, self.r2_test],
+                "R2_std":[self.r2_std_train, self.r2_std_test]
             }
         )
-        #print(results)
-        return results
+        return results    
 
     def get_attributes(self):
         """
@@ -477,3 +487,64 @@ def load_object(filename):
 
 
 #############################################
+# Model comparisons:
+#############################################
+
+def model_comparison_table(model_list):
+    """
+    This function creates a table with the results of the models in the model_list.
+    
+    Args:
+        model_list (list): List of models to be compared.
+
+    Returns:
+        table (pd.DataFrame): Table with the results of the models in the model_list.
+    """
+    table = pd.concat([i.get_results() for i in model_list])
+    set_index = table.pop('Set')
+    multiindex = [[model.name for model in model_list for _ in range(2)], 
+                set_index]
+    table.index = multiindex
+    table.index.names = ['Model', 'Set']
+    return table
+
+
+def model_comparison_plot(model_list, metric='RMSE'):
+    """
+    Creates a bar plot comparing the train and test metric values for a list of models.
+    
+    Args:
+        model_list (list): A list of Model objects.
+
+        metric (str): The metric to plot. 'RMSE' or 'R2'.
+    """
+    table = model_comparison_table(model_list).reset_index()
+    model_names = table['Model'].unique()
+
+    # Set the figure size and create a bar plot
+    fig, ax = plt.subplots( figsize=(10,6))
+    width = 0.35
+    train_color = 'steelblue'  # Choose a color for the train set bars
+    test_color = 'darkorange'  # Choose a color for the test set bars
+    for i, model in enumerate(model_names):
+        # Get the train and test metric values for the current model
+        train_val = table[(table['Model'] == model) & (table['Set'] == 'Train')][metric].values[0]
+        test_val = table[(table['Model'] == model) & (table['Set'] == 'Test')][metric].values[0]
+        # Get the train and test metric standard deviation values for the current model
+        train_val_std = table[(table['Model'] == model) & (table['Set'] == 'Train')][metric + '_std'].values[0]
+        test_val_std = table[(table['Model'] == model) & (table['Set'] == 'Test')][metric + '_std'].values[0]
+        # Create the bar plot
+        ax.bar(i-width/2, train_val, width, yerr=train_val_std, label=None, capsize=10, color=train_color)
+        ax.bar(i+width/2, test_val, width, yerr=test_val_std, label=None, capsize=10, color=test_color)
+
+    # Add the legend
+    ax.legend(['Train', 'Test'], loc='upper right')
+
+    # Set the axis labels
+    ax.set_xlabel('Model')
+    ax.set_ylabel(metric)
+    ax.set_xticks(range(len(model_names)))
+    ax.set_xticklabels(model_names)
+
+    # Show the plot
+    plt.show()
