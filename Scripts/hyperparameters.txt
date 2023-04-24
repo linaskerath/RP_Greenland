@@ -1,0 +1,10 @@
+Linear regression:      None
+
+Ridge regression:       alpha:    [0.5, 1, 2, 5, 10, 20]
+
+Lasso regression:       alpha:    [0.5, 1, 2, 5, 10, 20]
+
+ElasticNet regression:  alpha: 	  [0.5 1, 2, 5]
+			l1_ratio: [0.2, 0.5, 1, 2, 5] 
+
+RandomForestRegressor: 
