@@ -5,8 +5,9 @@ This script contains all necessary functions for the training pipeline.
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import rasterio
 
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt  # to plot kmeans splits
@@ -87,21 +88,21 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True):
     return df
 
 
-def data_normalization(df, features):
+def data_normalization(df):
     """
     Normalizes data with min-max (linear) or Z-score normalization depending on feature.
 
     Args:
         df (pandas.DataFrame): Full train/ test dataframe.
 
-        features (list of features): Names of features to be normalized.
-
     Returns:
         pandas.DataFrame: The same dataframe with normalized features.
     """
+    features = df.columns
+
     minmax_features = [
-        "col",
-        "row",
+        # "col",
+        # "row",
         "x",
         "y",
         "mean_3",
@@ -118,11 +119,11 @@ def data_normalization(df, features):
 
     for feature in features:
         if feature in minmax_features:
-            if feature == "col":
-                min, max = 0, 1461
-            elif feature == "row":
-                min, max = 0, 2662
-            elif feature == "x":
+            # if feature == "col":
+            #     min, max = 0, 1461
+            # elif feature == "row":
+            #     min, max = 0, 2662
+            if feature == "x":
                 min, max = -636500.0, 824500.0
             elif feature == "y":
                 min, max = -3324500.0, -662500.0
@@ -320,46 +321,53 @@ class Model:
         Returns:
             list of dates used in training/cv.
         """
-        return list(df["date"].unique())
+        return list((df["date"].min(), df["date"].max()))
 
-    def get_feature_importance(self, model, columns):
-        """
-        This function returns the feature importance of a model.
+    # def get_feature_importance(self, model, columns):
+    #     """
+    #     This function returns the feature importance of a model.
 
-        Args:
-            model (sklearn model): Model to get feature importance from.
+    #     Args:
+    #         model (sklearn model): Model to get feature importance from.
 
-            columns (list): List with column names used in the model.
+    #         columns (list): List with column names used in the model.
 
-        Returns:
-            dict: Dictionary with feature importance.
-        """
-        if isinstance(model, DecisionTreeRegressor):
-            feature_importance = model.feature_importances_
-        elif isinstance(model, RandomForestRegressor):
-            feature_importance = model.feature_importances_
-        elif isinstance(model, GradientBoostingRegressor):
-            feature_importance = model.feature_importances_
-        elif isinstance(model, LinearRegression):
-            feature_importance = np.abs(model.coef_) # [0]
-        elif isinstance(model, Ridge):
-            feature_importance = np.abs(model.coef_)
-        elif isinstance(model, Lasso):
-            feature_importance = np.abs(model.coef_)
-        elif isinstance(model, ElasticNet):
-            feature_importance = np.abs(model.coef_)
-        else:
-            print("model not supported")
+    #     Returns:
+    #         dict: Dictionary with feature importance.
+    #     """
+    #     if isinstance(model, DecisionTreeRegressor):
+    #         feature_importance = model.feature_importances_
+    #     elif isinstance(model, RandomForestRegressor):
+    #         feature_importance = model.feature_importances_
+    #     elif isinstance(model, GradientBoostingRegressor):
+    #         feature_importance = model.feature_importances_
+    #     elif isinstance(model, LinearRegression):
+    #         feature_importance = np.abs(model.coef_) # [0]
+    #     elif isinstance(model, Ridge):
+    #         feature_importance = np.abs(model.coef_)
+    #     elif isinstance(model, Lasso):
+    #         feature_importance = np.abs(model.coef_)
+    #     elif isinstance(model, ElasticNet):
+    #         feature_importance = np.abs(model.coef_)
+    #     else:
+    #         print("model not supported")
 
-        feature_importance_dict = dict(zip(columns, feature_importance))
-        return feature_importance_dict
+    #     feature_importance_dict = dict(zip(columns, feature_importance))
+    #     return feature_importance_dict
+    
+    def __check_columns(self, columns):
+        for col in columns:
+            if col in ['row', 'col', 'opt_value']:
+                print(f"Column {col} should not be included")
+                assert False
+        
 
     def spatial_cv(self, df, columns):
         """
         This function performs spatial cross-validation.
 
         Args:
-            df (pandas.DataFrame): Dataframe with data.
+            df (pandas.DataFrame): Dataframe with data (should include all columns, both used and not).
 
             columns (list): List with column names to be used in the model.
 
@@ -367,16 +375,16 @@ class Model:
             Nothing. But it assigns the RMSE and R2 scores for the train and test set to the model object.
                      It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
         """
-
-        # self.dates = self.__save_dates(df)
-        # columns = list(df.columns[df.columns != 'opt_value']) # and date ( and x and Y???)
+        self.__check_columns(columns)
+        self.dates = self.__save_dates(df)
+        self.columns = columns
 
         rmse_list_train = []
         rmse_list_test = []
         r2_list_train = []
         r2_list_test = []
-        self.best_hyperparameter_list = []
-        self.feature_importance_list = []
+        #self.best_hyperparameter_list = []
+        #self.feature_importance_list = []
         self.cv_model_list = []
 
         # split the data into outer folds:
@@ -389,14 +397,13 @@ class Model:
             train = self.__kmeans_split(train, "inner_area")
             # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
-            self.best_hyperparameter_list.append(best_hyperparam)
+            #self.best_hyperparameter_list.append(best_hyperparam)
 
             # with the best hyperparameters, train the model on the outer fold:
             train_X, train_y, test_X, test_y = self.__train_test_split(
                 df, columns, split_variable_name="outer_area", split_index=outer_split)
             regressor = self.model(**best_hyperparam).fit(train_X, train_y)
-            self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
-            # here save model
+            #self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
             self.cv_model_list.append(regressor)
 
             train_y_predicted = regressor.predict(train_X)
@@ -421,11 +428,11 @@ class Model:
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
-            self.final_hyperparameters = self.__tune_hyperparameters(
+            final_hyperparameters = self.__tune_hyperparameters(
                 df, columns, split_variable_name="final_split_areas")
         # fit final model:
-        self.final_model = self.model(**self.final_hyperparameters).fit(df[columns], df["opt_value"])
-        self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
+        self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
+        #self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
         return
     
@@ -548,3 +555,90 @@ def model_comparison_plot(model_list, metric='RMSE'):
 
     # Show the plot
     plt.show()
+
+#############################################
+# Model predictions:
+#############################################
+
+def mean_predict(model, data):
+    """
+    This function calculates mean predictions, std of predictions and error of predictions.
+
+    Args:
+        model (object): model object
+
+        data (dataframe): dataframe with data (should include all columns, both trained on and not).
+
+    Returns:
+        df_results (dataframe): dataframe with results (mean predictions, std and error of predictions).  
+    """
+    columns = model.columns
+    x_test = data[columns]
+    y_test = data['opt_value']
+    all_predictions = []
+    for i in range(len(model.cv_model_list)):
+        predictions_one_model = model.cv_model_list [i].predict(x_test)
+        all_predictions.append(predictions_one_model)
+    mean_prediction = np.mean(all_predictions, axis = 0)
+    std_prediction = np.std(all_predictions, axis = 0)
+    error_prediction = np.abs(mean_prediction - y_test)
+    df_results = pd.DataFrame(
+        {
+            'row': data['row'],
+            'col': data['col'],
+            'mean_prediction': mean_prediction,
+            'std_prediction': std_prediction,
+            'error_prediction': error_prediction
+        }
+    )
+
+    return df_results
+
+#############################################
+# Save to tif:
+#############################################
+
+def save_prediction_tif(df_predictions, metric, path_out):
+    """
+    Function to write predictions to .tif.
+    
+    Args:
+        df_predictions (dataframe): dataframe with predictions
+
+        metric_to_save (str): metric to save (mean, std or error)
+
+        path_out (str): path to save .tif file, path should include file name and extension
+    """
+    # original matrix shape:
+    nan_matrix = np.full((2663, 1462), np.nan)
+
+    for row in tqdm(df_predictions.iterrows()):  # fix progress bar?
+        row_index = int(row[1]["row"])
+        col_index = int(row[1]["col"])
+        pred_val = row[1][metric + "_prediction"]
+        nan_matrix[row_index][col_index] = pred_val
+
+    convert_to_tif(nan_matrix, path_out)
+    return
+
+
+def convert_to_tif(data, path_out):
+    """
+    Function to convert data to tif file.
+
+    Args:
+        data (numpy array or xarray): data to convert to tif
+
+        path_out (str): path to save .tif file, path should include file name and extension
+
+    Returns:
+        .tif file
+    """
+    path_file_metadata = r"../Data/microwave-rs/mw_interpolated/2019-07-01_mw.tif"
+    
+    with rasterio.open(path_file_metadata) as src:
+        kwargs1 = src.meta.copy()
+
+    with rasterio.open(path_out, "w", **kwargs1) as dst:
+        dst.write_band(1, data)  # numpy array or xarray
+    return
