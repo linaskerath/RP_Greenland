@@ -7,20 +7,19 @@ from tqdm import tqdm
 import numpy as np
 import rasterio
 
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt  # to plot kmeans splits
 from sklearn.model_selection import ParameterGrid
 
 # import models:
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import Ridge
-from sklearn.linear_model import Lasso
-from sklearn.linear_model import ElasticNet
-from sklearn.ensemble import GradientBoostingRegressor
+# from sklearn.tree import DecisionTreeRegressor
+# from sklearn.ensemble import RandomForestRegressor
+# from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import Ridge
+# from sklearn.linear_model import Lasso
+# from sklearn.linear_model import ElasticNet
+# from sklearn.ensemble import GradientBoostingRegressor
 
 
 #############################################
@@ -48,7 +47,7 @@ def import_data(date_from: str, date_to: str, df_path: str):
     df_list = []
 
     for melt_date in tqdm(date_range):
-        #print(melt_date)
+        # print(melt_date)
         try:  # bc some days are empty
             file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
             df_list.append(file)  # list of df
@@ -354,13 +353,12 @@ class Model:
 
     #     feature_importance_dict = dict(zip(columns, feature_importance))
     #     return feature_importance_dict
-    
+
     def __check_columns(self, columns):
         for col in columns:
-            if col in ['row', 'col', 'opt_value']:
+            if col in ["row", "col", "opt_value"]:
                 print(f"Column {col} should not be included")
                 assert False
-        
 
     def spatial_cv(self, df, columns):
         """
@@ -383,8 +381,8 @@ class Model:
         rmse_list_test = []
         r2_list_train = []
         r2_list_test = []
-        #self.best_hyperparameter_list = []
-        #self.feature_importance_list = []
+        # self.best_hyperparameter_list = []
+        # self.feature_importance_list = []
         self.cv_model_list = []
 
         # split the data into outer folds:
@@ -397,13 +395,14 @@ class Model:
             train = self.__kmeans_split(train, "inner_area")
             # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
-            #self.best_hyperparameter_list.append(best_hyperparam)
+            # self.best_hyperparameter_list.append(best_hyperparam)
 
             # with the best hyperparameters, train the model on the outer fold:
             train_X, train_y, test_X, test_y = self.__train_test_split(
-                df, columns, split_variable_name="outer_area", split_index=outer_split)
+                df, columns, split_variable_name="outer_area", split_index=outer_split
+            )
             regressor = self.model(**best_hyperparam).fit(train_X, train_y)
-            #self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
+            # self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
             self.cv_model_list.append(regressor)
 
             train_y_predicted = regressor.predict(train_X)
@@ -428,14 +427,13 @@ class Model:
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
-            final_hyperparameters = self.__tune_hyperparameters(
-                df, columns, split_variable_name="final_split_areas")
+            final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name="final_split_areas")
         # fit final model:
         self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
-        #self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
+        # self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
         return
-    
+
     def get_results(self):
         """
         This function prints the results of the model in a table.
@@ -443,13 +441,13 @@ class Model:
         results = pd.DataFrame(
             {
                 "Set": ["Train", "Test"],
-                "RMSE":[self.rmse_train, self.rmse_test],
-                "RMSE_std":[self.rmse_std_train, self.rmse_std_test],
-                "R2":[self.r2_train, self.r2_test],
-                "R2_std":[self.r2_std_train, self.r2_std_test]
+                "RMSE": [self.rmse_train, self.rmse_test],
+                "RMSE_std": [self.rmse_std_train, self.rmse_std_test],
+                "R2": [self.r2_train, self.r2_test],
+                "R2_std": [self.r2_std_train, self.r2_std_test],
             }
         )
-        return results    
+        return results
 
     def get_attributes(self):
         """
@@ -497,10 +495,11 @@ def load_object(filename):
 # Model comparisons:
 #############################################
 
+
 def model_comparison_table(model_list):
     """
     This function creates a table with the results of the models in the model_list.
-    
+
     Args:
         model_list (list): List of models to be compared.
 
@@ -508,47 +507,46 @@ def model_comparison_table(model_list):
         table (pd.DataFrame): Table with the results of the models in the model_list.
     """
     table = pd.concat([i.get_results() for i in model_list])
-    set_index = table.pop('Set')
-    multiindex = [[model.name for model in model_list for _ in range(2)], 
-                set_index]
+    set_index = table.pop("Set")
+    multiindex = [[model.name for model in model_list for _ in range(2)], set_index]
     table.index = multiindex
-    table.index.names = ['Model', 'Set']
+    table.index.names = ["Model", "Set"]
     return table
 
 
-def model_comparison_plot(model_list, metric='RMSE'):
+def model_comparison_plot(model_list, metric="RMSE"):
     """
     Creates a bar plot comparing the train and test metric values for a list of models.
-    
+
     Args:
         model_list (list): A list of Model objects.
 
         metric (str): The metric to plot. 'RMSE' or 'R2'.
     """
     table = model_comparison_table(model_list).reset_index()
-    model_names = table['Model'].unique()
+    model_names = table["Model"].unique()
 
     # Set the figure size and create a bar plot
-    fig, ax = plt.subplots( figsize=(10,6))
+    fig, ax = plt.subplots(figsize=(10, 6))
     width = 0.35
-    train_color = 'steelblue'  # Choose a color for the train set bars
-    test_color = 'darkorange'  # Choose a color for the test set bars
+    train_color = "steelblue"  # Choose a color for the train set bars
+    test_color = "darkorange"  # Choose a color for the test set bars
     for i, model in enumerate(model_names):
         # Get the train and test metric values for the current model
-        train_val = table[(table['Model'] == model) & (table['Set'] == 'Train')][metric].values[0]
-        test_val = table[(table['Model'] == model) & (table['Set'] == 'Test')][metric].values[0]
+        train_val = table[(table["Model"] == model) & (table["Set"] == "Train")][metric].values[0]
+        test_val = table[(table["Model"] == model) & (table["Set"] == "Test")][metric].values[0]
         # Get the train and test metric standard deviation values for the current model
-        train_val_std = table[(table['Model'] == model) & (table['Set'] == 'Train')][metric + '_std'].values[0]
-        test_val_std = table[(table['Model'] == model) & (table['Set'] == 'Test')][metric + '_std'].values[0]
+        train_val_std = table[(table["Model"] == model) & (table["Set"] == "Train")][metric + "_std"].values[0]
+        test_val_std = table[(table["Model"] == model) & (table["Set"] == "Test")][metric + "_std"].values[0]
         # Create the bar plot
-        ax.bar(i-width/2, train_val, width, yerr=train_val_std, label=None, capsize=10, color=train_color)
-        ax.bar(i+width/2, test_val, width, yerr=test_val_std, label=None, capsize=10, color=test_color)
+        ax.bar(i - width / 2, train_val, width, yerr=train_val_std, label=None, capsize=10, color=train_color)
+        ax.bar(i + width / 2, test_val, width, yerr=test_val_std, label=None, capsize=10, color=test_color)
 
     # Add the legend
-    ax.legend(['Train', 'Test'], loc='upper right')
+    ax.legend(["Train", "Test"], loc="upper right")
 
     # Set the axis labels
-    ax.set_xlabel('Model')
+    ax.set_xlabel("Model")
     ax.set_ylabel(metric)
     ax.set_xticks(range(len(model_names)))
     ax.set_xticklabels(model_names)
@@ -556,9 +554,11 @@ def model_comparison_plot(model_list, metric='RMSE'):
     # Show the plot
     plt.show()
 
+
 #############################################
 # Model predictions:
 #############################################
+
 
 def mean_predict(model, data):
     """
@@ -570,38 +570,40 @@ def mean_predict(model, data):
         data (dataframe): dataframe with data (should include all columns, both trained on and not).
 
     Returns:
-        df_results (dataframe): dataframe with results (mean predictions, std and error of predictions).  
+        df_results (dataframe): dataframe with results (mean predictions, std and error of predictions).
     """
     columns = model.columns
     x_test = data[columns]
-    y_test = data['opt_value']
+    y_test = data["opt_value"]
     all_predictions = []
     for i in range(len(model.cv_model_list)):
-        predictions_one_model = model.cv_model_list [i].predict(x_test)
+        predictions_one_model = model.cv_model_list[i].predict(x_test)
         all_predictions.append(predictions_one_model)
-    mean_prediction = np.mean(all_predictions, axis = 0)
-    std_prediction = np.std(all_predictions, axis = 0)
+    mean_prediction = np.mean(all_predictions, axis=0)
+    std_prediction = np.std(all_predictions, axis=0)
     error_prediction = np.abs(mean_prediction - y_test)
     df_results = pd.DataFrame(
         {
-            'row': data['row'],
-            'col': data['col'],
-            'mean_prediction': mean_prediction,
-            'std_prediction': std_prediction,
-            'error_prediction': error_prediction
+            "row": data["row"],
+            "col": data["col"],
+            "mean_prediction": mean_prediction,
+            "std_prediction": std_prediction,
+            "error_prediction": error_prediction,
         }
     )
 
     return df_results
 
+
 #############################################
 # Save to tif:
 #############################################
 
+
 def save_prediction_tif(df_predictions, metric, path_out):
     """
     Function to write predictions to .tif.
-    
+
     Args:
         df_predictions (dataframe): dataframe with predictions
 
@@ -635,7 +637,7 @@ def convert_to_tif(data, path_out):
         .tif file
     """
     path_file_metadata = r"../Data/microwave-rs/mw_interpolated/2019-07-01_mw.tif"
-    
+
     with rasterio.open(path_file_metadata) as src:
         kwargs1 = src.meta.copy()
 

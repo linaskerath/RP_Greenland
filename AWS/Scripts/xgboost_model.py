@@ -17,7 +17,7 @@ data = f.data_normalization(data)
 
 columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
-xgb = f.Model(model=GradientBoostingRegressor, name="XGB")
+xgb = f.Model(model=GradientBoostingRegressor, name="XGBoost")
 hyperparameters_for_grid = {"min_samples_split": [3, 5], "learning_rate": [0.1, 0.5]}
 xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
