@@ -357,7 +357,7 @@ class Model:
     
     def __check_columns(self, columns):
         for col in columns:
-            if col in ['row', 'col', 'opt_value']:
+            if col in ['row', 'col', 'date', 'opt_value']:
                 print(f"Column {col} should not be included")
                 assert False
         
