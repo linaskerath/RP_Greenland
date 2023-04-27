@@ -3,3 +3,4 @@ Data/*
 !Data/results_2023
 !Data/split_indexes
 Models/*
+!Scripts/pycache
