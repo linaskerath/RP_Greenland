@@ -3,4 +3,6 @@ Data/*
 !Data/results_2023
 !Data/split_indexes
 Models/*
-!Scripts/pycache
+Scripts/__pycache__
+AWS/Scripts/config.ini
+AWS/Scripts/__pycache__
