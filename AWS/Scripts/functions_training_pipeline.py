@@ -7,19 +7,20 @@ from tqdm import tqdm
 import numpy as np
 import rasterio
 
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
 import matplotlib.pyplot as plt  # to plot kmeans splits
 from sklearn.model_selection import ParameterGrid
 
 # import models:
-# from sklearn.tree import DecisionTreeRegressor
-# from sklearn.ensemble import RandomForestRegressor
-# from sklearn.linear_model import LinearRegression
-# from sklearn.linear_model import Ridge
-# from sklearn.linear_model import Lasso
-# from sklearn.linear_model import ElasticNet
-# from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import ElasticNet
+from sklearn.ensemble import GradientBoostingRegressor
 
 
 #############################################
@@ -356,7 +357,7 @@ class Model:
 
     def __check_columns(self, columns):
         for col in columns:
-            if col in ["row", "col", "opt_value"]:
+            if col in ["row", "col", "date", "opt_value"]:
                 print(f"Column {col} should not be included")
                 assert False
 
@@ -407,6 +408,9 @@ class Model:
 
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
+
+            train_y_predicted = np.exp(train_y_predicted)
+            test_y_predicted = np.exp(train_y_predicted)
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
