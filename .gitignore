@@ -6,3 +6,4 @@ Models/*
 Scripts/__pycache__
 AWS/Scripts/config.ini
 AWS/Scripts/__pycache__
+AWS/Data/*
