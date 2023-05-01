@@ -164,22 +164,22 @@ def data_normalization(df):
 #############################################
 
 
-def model_meanBenchmark(y_train, y_test):
-    """
-    Creates predictions for mean benchmark.
+# def model_meanBenchmark(y_train, y_test):
+#     """
+#     Creates predictions for mean benchmark.
 
-    Args:
-        y_train (pandas.DataFrame): Dataframe with train labels, one column.
+#     Args:
+#         y_train (pandas.DataFrame): Dataframe with train labels, one column.
 
-        y_test (pandas.DataFrame): Dataframe with test labels, one column.
+#         y_test (pandas.DataFrame): Dataframe with test labels, one column.
 
-    Returns:
-        list: Lists with predicted values for test set.
-    """
+#     Returns:
+#         list: Lists with predicted values for test set.
+#     """
+#     y_predicted = np.full((1, len(y_test)), y_train.mean())[0]
 
-    y_predicted = np.full((1, len(y_test)), y_train.mean())[0]
+#     return y_predicted
 
-    return y_predicted
 
 
 def model_mwBenchmark(X_test):
@@ -323,38 +323,6 @@ class Model:
         """
         return list((df["date"].min(), df["date"].max()))
 
-    # def get_feature_importance(self, model, columns):
-    #     """
-    #     This function returns the feature importance of a model.
-
-    #     Args:
-    #         model (sklearn model): Model to get feature importance from.
-
-    #         columns (list): List with column names used in the model.
-
-    #     Returns:
-    #         dict: Dictionary with feature importance.
-    #     """
-    #     if isinstance(model, DecisionTreeRegressor):
-    #         feature_importance = model.feature_importances_
-    #     elif isinstance(model, RandomForestRegressor):
-    #         feature_importance = model.feature_importances_
-    #     elif isinstance(model, GradientBoostingRegressor):
-    #         feature_importance = model.feature_importances_
-    #     elif isinstance(model, LinearRegression):
-    #         feature_importance = np.abs(model.coef_) # [0]
-    #     elif isinstance(model, Ridge):
-    #         feature_importance = np.abs(model.coef_)
-    #     elif isinstance(model, Lasso):
-    #         feature_importance = np.abs(model.coef_)
-    #     elif isinstance(model, ElasticNet):
-    #         feature_importance = np.abs(model.coef_)
-    #     else:
-    #         print("model not supported")
-
-    #     feature_importance_dict = dict(zip(columns, feature_importance))
-    #     return feature_importance_dict
-
     def __check_columns(self, columns):
         for col in columns:
             if col in ["row", "col", "date", "opt_value"]:
@@ -436,6 +404,53 @@ class Model:
         self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
         # self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
+        return
+    
+    def spatial_cv_mean_benchmark(self, df, columns):
+
+        rmse_list_train = []
+        rmse_list_test = []
+        r2_list_train = []
+        r2_list_test = []
+
+        self.cv_mean_list = []
+
+        # split the data into outer folds:
+        df = self.__kmeans_split(df, "outer_area")
+        # for each outer fold:
+        for outer_split in df["outer_area"].unique():
+
+            train_X, train_y, test_X, test_y = self.__train_test_split(
+                df, columns, split_variable_name="outer_area", split_index=outer_split
+            )
+
+            mean_ = train_y.mean()
+            train_y_predicted = np.full((1, len(train_y)), mean_)[0]
+            test_y_predicted = np.full((1, len(test_y)), mean_)[0]
+
+            self.cv_mean_list.append(mean_)
+
+            train_y_predicted = np.exp(train_y_predicted)
+            test_y_predicted = np.exp(test_y_predicted)
+
+            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
+            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
+            r2_list_train.append(r2_score(train_y, train_y_predicted))
+            r2_list_test.append(r2_score(test_y, test_y_predicted))
+
+        # results:
+        self.rmse_train = np.mean(rmse_list_train)
+        self.rmse_std_train = np.std(rmse_list_train)
+        self.rmse_test = np.mean(rmse_list_test)
+        self.rmse_std_test = np.std(rmse_list_test)
+        self.r2_train = np.mean(r2_list_train)
+        self.r2_std_train = np.std(r2_list_train)
+        self.r2_test = np.mean(r2_list_test)
+        self.r2_std_test = np.std(r2_list_test)
+
+        print(f"Microwave benchmark RMSE on test set: {self.rmse_test}")
+        print(f"Microwave benchmark R2 on test set: {self.r2_test}")
+        print(f"Means: {self.cv_mean_list}")
         return
 
     def get_results(self):
