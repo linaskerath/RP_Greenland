@@ -4,6 +4,6 @@ Data/*
 !Data/split_indexes
 Models/*
 Scripts/__pycache__
-AWS/Scripts/config.ini
-AWS/Scripts/__pycache__
-AWS/Data/*
+AWS_Scripts/config.ini
+AWS_Scripts/__pycache__
+AWS_Data/*
