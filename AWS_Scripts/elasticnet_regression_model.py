@@ -1,15 +1,15 @@
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import ElasticNet
+import smtplib
+import configparser
+from email.message import EmailMessage
 
 pd.options.mode.chained_assignment = None
 
 import functions_training_pipeline as f
 
-import smtplib
-import configparser
-from email.message import EmailMessage
 
-df_path = r"../Data/dataframe_extended/"
+df_path = r"../AWS_Data/Data/dataframe_extended/"
 
 date_from = "2017-05-01"
 date_to = "2019-07-31"
@@ -20,19 +20,13 @@ data = f.data_normalization(data)
 
 columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
-rf = f.Model(model=RandomForestRegressor, name="RandomForest")
-hyperparameters_for_grid = {
-    "max_features": ["sqrt", 9, "None"],
-    "sample_size": [0.6, "None"],
-    "min_samples_leaf": [2, 5, 10],
-    "n_estimators": [300],
-}
-rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)
+elasticnet = f.Model(model=ElasticNet, name="ElasticNetRegression")
+hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10], "l1_ratio": [0.2, 0.5, 1, 2, 5, 10]}
+elasticnet.hyperparameters = elasticnet.create_hyperparameter_grid(hyperparameters_for_grid)
 
-rf.spatial_cv(data, columns)
+elasticnet.spatial_cv(data, columns)
 
-f.save_object(rf)
-
+f.save_object(elasticnet)
 
 # Read email credentials from config file
 config = configparser.ConfigParser()

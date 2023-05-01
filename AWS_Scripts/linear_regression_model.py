@@ -1,15 +1,15 @@
 import pandas as pd
-from sklearn.linear_model import ElasticNet
-import smtplib
-import configparser
-from email.message import EmailMessage
+from sklearn.linear_model import LinearRegression
 
 pd.options.mode.chained_assignment = None
 
 import functions_training_pipeline as f
 
+import smtplib
+import configparser
+from email.message import EmailMessage
 
-df_path = r"../Data/dataframe_extended/"
+df_path = r"../AWS_Data/Data/dataframe_extended/"
 
 date_from = "2017-05-01"
 date_to = "2019-07-31"
@@ -20,13 +20,14 @@ data = f.data_normalization(data)
 
 columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
-elasticnet = f.Model(model=ElasticNet, name="ElasticNetRegression")
-hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10], "l1_ratio": [0.2, 0.5, 1, 2, 5, 10]}
-elasticnet.hyperparameters = elasticnet.create_hyperparameter_grid(hyperparameters_for_grid)
+lr = f.Model(model=LinearRegression, name="LinearRegression")
+hyperparameters_for_grid = {"fit_intercept": [True]}
+lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
 
-elasticnet.spatial_cv(data, columns)
+lr.spatial_cv(data, columns)
 
-f.save_object(elasticnet)
+f.save_object(lr)
+
 
 # Read email credentials from config file
 config = configparser.ConfigParser()
