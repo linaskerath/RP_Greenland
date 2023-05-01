@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.linear_model import Lasso
+from sklearn.ensemble import GradientBoostingRegressor
 
 pd.options.mode.chained_assignment = None
 
@@ -9,10 +9,10 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"../Data/dataframe_extended/"
+df_path = r"../AWS_Data/Data/dataframe_extended/"
 
-date_from = "2017-05-01"
-date_to = "2019-07-31"
+date_from = "2019-06-10"
+date_to = "2019-06-11"
 
 data = f.import_data(date_from, date_to, df_path)
 data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
@@ -20,13 +20,13 @@ data = f.data_normalization(data)
 
 columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
-lasso = f.Model(model=Lasso, name="LassoRegression")
-hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10, 20]}
-lasso.hyperparameters = lasso.create_hyperparameter_grid(hyperparameters_for_grid)
+xgb = f.Model(model=GradientBoostingRegressor, name="XGBoost")
+hyperparameters_for_grid = {"min_samples_split": [3, 5], "learning_rate": [0.1, 0.5]}
+xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
-lasso.spatial_cv(data, columns)
+xgb.spatial_cv(data, columns)
 
-f.save_object(lasso)
+f.save_object(xgb)
 
 
 # Read email credentials from config file

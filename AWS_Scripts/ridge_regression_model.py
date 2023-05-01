@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
 
 pd.options.mode.chained_assignment = None
 
@@ -9,7 +9,7 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"../Data/dataframe_extended/"
+df_path = r"../AWS_Data/Data/dataframe_extended/"
 
 date_from = "2017-05-01"
 date_to = "2019-07-31"
@@ -20,13 +20,13 @@ data = f.data_normalization(data)
 
 columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
-lr = f.Model(model=LinearRegression, name="LinearRegression")
-hyperparameters_for_grid = {"fit_intercept": [True]}
-lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
+ridge = f.Model(model=Ridge, name="RidgeRegression")
+hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10, 20]}
+ridge.hyperparameters = ridge.create_hyperparameter_grid(hyperparameters_for_grid)
 
-lr.spatial_cv(data, columns)
+ridge.spatial_cv(data, columns)
 
-f.save_object(lr)
+f.save_object(ridge)
 
 
 # Read email credentials from config file

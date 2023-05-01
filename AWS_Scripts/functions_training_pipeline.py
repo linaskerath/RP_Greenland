@@ -474,7 +474,7 @@ def save_object(obj):
 
         filename (str): Name of the file to be saved, with extension, without path unless a subfolder is desired.
     """
-    filename = r"../Models/" + obj.name + ".pkl"
+    filename = r"../AWS_Data/Models/" + obj.name + ".pkl"
     with open(filename, "wb") as outp:  # Overwrites any existing file.
         pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
 
@@ -489,7 +489,7 @@ def load_object(filename):
     Returns:
             obj (object): Loaded object.
     """
-    filename = r"../Models/" + filename + ".pkl"
+    filename = r"../AWS_Data/Models/" + filename + ".pkl"
     with open(filename, "rb") as inp:
         obj = pickle.load(inp)
     return obj
