@@ -90,7 +90,7 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True):
 
 def data_normalization(df):
     """
-    Normalizes data with min-max (linear) or Z-score normalization depending on feature.
+    Normalizes data with linear (min-max) or log normalization depending on feature.
 
     Args:
         df (pandas.DataFrame): Full train/ test dataframe.
