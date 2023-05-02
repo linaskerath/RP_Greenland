@@ -36,19 +36,22 @@ def import_data(date_from: str, date_to: str, df_path: str):
 
     date_range = pd.date_range(date_from, date_to)  # both ends included
     date_range = [str(day.date()) for day in date_range]
-    df = pl.DataFrame()
+    df = pd.DataFrame()
 
     for melt_date in tqdm(date_range):
         # print(melt_date)
         try:  # bc some days are empty
-            file = pl.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
             # drop columns row, col, date as not needed
-            file = file.drop(["row", "col", "date"])
-            df = pl.concat([df, file])
+            file = file.drop(columns=["row", "col", "date"], axis=1)
+            # remove masked data
+            file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True)
+
+            df = pd.concat([df, file], axis=0)
         except:
             continue
 
-    df = df.to_pandas()
+    # df = df.to_pandas()
 
     return df
 
@@ -335,7 +338,7 @@ class Model:
                      It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
         """
         self.__check_columns(columns)
-        self.dates = self.__save_dates(df)
+        # self.dates = self.__save_dates(df)
         self.columns = columns
 
         rmse_list_train = []
