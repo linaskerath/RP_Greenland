@@ -1,0 +1,19 @@
+Linear regression:      	None 			(fit_intercept = True)
+
+Ridge regression:       	alpha:   		[0.5, 1, 2, 5, 10, 20]
+
+Lasso regression:       	alpha:    		[0.5, 1, 2, 5, 10, 20]
+
+ElasticNet regression:  	alpha: 	  		[0.5, 1, 2, 5, 10]
+				l1_ratio: 		[0.2, 0.5, 1, 2, 5, 10] 
+
+RandomForestRegressor: 		max_features:		['sqrt', 9, 'None']
+		       		sample_size:		[0.6, 'None']
+		       		min_samples_leaf:	[2, 5, 10]
+		       		n_estimators: 		[300]
+
+GradientBoostingRegressor:	learning_rate: 		[0.06, 0.1, 0.4]
+				max_depth:		[2, 3, 5]
+				n_estimators:		[300-500?]
+				max_features:		best of RF?
+				min_samples_leaf:	best of RF or default?
