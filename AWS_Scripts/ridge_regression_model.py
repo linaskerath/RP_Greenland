@@ -9,22 +9,14 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
-
-date_from = "2017-05-01"
-date_to = "2019-07-31"
-
-data = f.import_data(date_from, date_to, df_path)
-data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
-data = f.data_normalization(data)
-
-columns = data.columns.drop(["date", "row", "col", "opt_value"])
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 ridge = f.Model(model=Ridge, name="RidgeRegression")
 hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10, 20]}
 ridge.hyperparameters = ridge.create_hyperparameter_grid(hyperparameters_for_grid)
 
-ridge.spatial_cv(data, columns)
+data = pd.read_parquet(df_path)
+ridge.spatial_cv(data, data.columns)
 
 f.save_object(ridge)
 

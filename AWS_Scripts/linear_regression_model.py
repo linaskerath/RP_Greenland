@@ -9,22 +9,15 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
-date_from = "2017-05-01"
-date_to = "2019-07-31"
-
-data = f.import_data(date_from, date_to, df_path)
-data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
-data = f.data_normalization(data)
-
-columns = data.columns.drop(["date", "row", "col", "opt_value"])
 
 lr = f.Model(model=LinearRegression, name="LinearRegression")
 hyperparameters_for_grid = {"fit_intercept": [True]}
 lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
 
-lr.spatial_cv(data, columns)
+data = pd.read_parquet(df_path)
+lr.spatial_cv(data, data.columns)
 
 f.save_object(lr)
 

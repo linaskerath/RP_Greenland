@@ -5,9 +5,8 @@ This script contains all necessary functions for the training pipeline.
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-import dask.dataframe as dd
-from dask.diagnostics import ProgressBar
-from dask import delayed
+import polars as pl
+import pyarrow
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
@@ -35,39 +34,21 @@ def import_data(date_from: str, date_to: str, df_path: str):
         pandas.DataFrame: Dataframe with all merged data.
     """
 
-    @delayed
-    def read_parquet_file(filepath):
-        try:
-            return dd.read_parquet(filepath, assume_missing=True)
-        except:
-            return dd.from_pandas(pd.DataFrame())  # return an empty dataframe
-
-    @delayed
-    def drop_unnecessary_cols(df):
-        cols_to_drop = ["date", "row", "col"]  # add columns to drop here
-        return df.drop(cols_to_drop, axis=1)
-
     date_range = pd.date_range(date_from, date_to)  # both ends included
     date_range = [str(day.date()) for day in date_range]
-    df_list = []
+    df = pl.DataFrame()
 
     for melt_date in tqdm(date_range):
         # print(melt_date)
         try:  # bc some days are empty
-            file = read_parquet_file(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
-            if not file.empty:
-                df_list.append(file)
+            file = pl.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            # drop columns row, col, date as not needed
+            file = file.drop(["row", "col", "date"])
+            df = pl.concat([df, file])
         except:
             continue
 
-    df_list = [drop_unnecessary_cols(df) for df in df_list]  # drop unnecessary columns
-    df_list = [df.persist() for df in df_list]
-    print("Concatenate data.")
-    df = dd.from_delayed(df_list)
-    del df_list
-
-    with ProgressBar():
-        df = df.compute()
+    df = df.to_pandas()
 
     return df
 
