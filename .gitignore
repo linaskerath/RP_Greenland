@@ -1,9 +1,8 @@
-Data/*
-!Data/results_2022
-!Data/results_2023
-!Data/split_indexes
-Models/*
-Scripts/__pycache__
 AWS_Scripts/config.ini
 AWS_Scripts/__pycache__
 AWS_Data/*
+Data/*
+!Data/results_2022
+!Data/results_2023
+Models_Testing/*
+Scripts/__pycache__
