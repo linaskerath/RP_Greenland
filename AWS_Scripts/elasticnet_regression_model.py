@@ -9,7 +9,7 @@ pd.options.mode.chained_assignment = None
 import functions_training_pipeline as f
 
 
-df_path = r"../AWS_Data/Data/dataframe_extended/"
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
 
 date_from = "2017-05-01"
 date_to = "2019-07-31"

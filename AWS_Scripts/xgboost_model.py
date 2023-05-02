@@ -9,7 +9,7 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"../AWS_Data/Data/dataframe_extended/"
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
 
 date_from = "2019-06-10"
 date_to = "2019-06-11"

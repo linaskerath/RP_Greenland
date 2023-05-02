@@ -9,7 +9,7 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"../Data/dataframe_extended/"
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
 
 date_from = "2017-05-01"
 date_to = "2019-07-31"
@@ -20,8 +20,8 @@ data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
 data = f.data_normalization(data)
 
 print("Mean benchmark")
-mean_benchmark_model = f.Model(model= None, name="MeanBenchmark")
-columns = ['mw_value']
+mean_benchmark_model = f.Model(model=None, name="MeanBenchmark")
+columns = ["mw_value"]
 mean_benchmark_model.spatial_cv_mean_benchmark(data, columns)
 
 
@@ -29,7 +29,6 @@ print("Microwave benchmark")
 y_predictions_mw = f.model_mwBenchmark(data)
 print(f"Microwave benchmark RMSE on test set: {mean_squared_error(data['opt_value'], data['mw_value'])}")
 print(f"Microwave benchmark R2 on test set: {r2_score(data['opt_value'], data['mw_value'])}")
-
 
 
 # Read email credentials from config file
