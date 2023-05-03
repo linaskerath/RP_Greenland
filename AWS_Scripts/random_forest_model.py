@@ -21,7 +21,8 @@ hyperparameters_for_grid = {
 rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
-rf.spatial_cv(data, data.columns)
+columns = data.columns.drop(["opt_value"])
+rf.spatial_cv(data, columns)
 
 f.save_object(rf)
 

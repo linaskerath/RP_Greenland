@@ -16,7 +16,8 @@ hyperparameters_for_grid = {"min_samples_split": [3, 5], "learning_rate": [0.1, 
 xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
-xgb.spatial_cv(data, data.columns)
+columns = data.columns.drop(["opt_value"])
+xgb.spatial_cv(data, columns)
 
 f.save_object(xgb)
 
