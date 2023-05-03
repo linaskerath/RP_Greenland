@@ -353,6 +353,7 @@ class Model:
         df = self.__kmeans_split(df, "outer_area")
         # for each outer fold:
         for outer_split in df["outer_area"].unique():
+            print("Spatial CV, outer split: ", outer_split)
             # define only train set (to be used in inner loop of nested cross-validation)
             train = df[df["outer_area"] != outer_split]
             # split the data into inner folds:
@@ -373,7 +374,7 @@ class Model:
             test_y_predicted = regressor.predict(test_X)
 
             train_y_predicted = np.exp(train_y_predicted)
-            test_y_predicted = np.exp(train_y_predicted)
+            test_y_predicted = np.exp(test_y_predicted)
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
@@ -394,6 +395,7 @@ class Model:
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
+            print("Spatial CV, final split: ", split)
             final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name="final_split_areas")
         # fit final model:
         self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
