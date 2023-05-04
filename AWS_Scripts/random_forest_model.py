@@ -13,8 +13,8 @@ df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.par
 
 rf = f.Model(model=RandomForestRegressor, name="RandomForest")
 hyperparameters_for_grid = {
-    "max_features": ["sqrt", 9, "None"],
-    "sample_size": [0.6, "None"],
+    "max_features": ["sqrt", 9, None],
+    "max_samples": [0.6, None],
     "min_samples_leaf": [2, 5, 10],
     "n_estimators": [300],
 }

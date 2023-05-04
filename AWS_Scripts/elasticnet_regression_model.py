@@ -11,7 +11,7 @@ import functions_training_pipeline as f
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 elasticnet = f.Model(model=ElasticNet, name="ElasticNetRegression")
-hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10], "l1_ratio": [0.2, 0.5, 1, 2, 5, 10]}
+hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10], "l1_ratio": [0.1, 0.3, 0.5, 0.7, 0.9]}
 elasticnet.hyperparameters = elasticnet.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
