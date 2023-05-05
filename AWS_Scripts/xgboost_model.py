@@ -9,21 +9,14 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
-
-date_from = "2019-06-10"
-date_to = "2019-06-11"
-
-data = f.import_data(date_from, date_to, df_path)
-data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
-data = f.data_normalization(data)
-
-columns = data.columns.drop(["date", "row", "col", "opt_value"])
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 xgb = f.Model(model=GradientBoostingRegressor, name="XGBoost")
 hyperparameters_for_grid = {"min_samples_split": [3, 5], "learning_rate": [0.1, 0.5]}
 xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
+data = pd.read_parquet(df_path)
+columns = data.columns.drop(["opt_value"])
 xgb.spatial_cv(data, columns)
 
 f.save_object(xgb)

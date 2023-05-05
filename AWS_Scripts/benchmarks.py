@@ -9,20 +9,13 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
-
-date_from = "2017-05-01"
-date_to = "2019-07-31"
-
-
-data = f.import_data(date_from, date_to, df_path)
-data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
-data = f.data_normalization(data)
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
+data = pd.read_parquet(df_path)
 
 print("Mean benchmark")
 mean_benchmark_model = f.Model(model=None, name="MeanBenchmark")
 columns = ["mw_value"]
-mean_benchmark_model.spatial_cv_mean_benchmark(data, columns)
+mean_benchmark_model.spatial_cv_mean_benchmark(data, data.columns)
 
 
 print("Microwave benchmark")

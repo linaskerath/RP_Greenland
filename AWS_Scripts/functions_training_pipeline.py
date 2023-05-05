@@ -5,9 +5,8 @@ This script contains all necessary functions for the training pipeline.
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-import dask.dataframe as dd
-from dask.diagnostics import ProgressBar
-from dask import delayed
+import polars as pl
+import pyarrow
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
@@ -35,39 +34,24 @@ def import_data(date_from: str, date_to: str, df_path: str):
         pandas.DataFrame: Dataframe with all merged data.
     """
 
-    @delayed
-    def read_parquet_file(filepath):
-        try:
-            return dd.read_parquet(filepath, assume_missing=True)
-        except:
-            return dd.from_pandas(pd.DataFrame())  # return an empty dataframe
-
-    @delayed
-    def drop_unnecessary_cols(df):
-        cols_to_drop = ["date", "row", "col"]  # add columns to drop here
-        return df.drop(cols_to_drop, axis=1)
-
     date_range = pd.date_range(date_from, date_to)  # both ends included
     date_range = [str(day.date()) for day in date_range]
-    df_list = []
+    df = pd.DataFrame()
 
     for melt_date in tqdm(date_range):
         # print(melt_date)
         try:  # bc some days are empty
-            file = read_parquet_file(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
-            if not file.empty:
-                df_list.append(file)
+            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            # drop columns row, col, date as not needed
+            file = file.drop(columns=["row", "col", "date"], axis=1)
+            # remove masked data
+            file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True)
+
+            df = pd.concat([df, file], axis=0)
         except:
             continue
 
-    df_list = [drop_unnecessary_cols(df) for df in df_list]  # drop unnecessary columns
-    df_list = [df.persist() for df in df_list]
-    print("Concatenate data.")
-    df = dd.from_delayed(df_list)
-    del df_list
-
-    with ProgressBar():
-        df = df.compute()
+    # df = df.to_pandas()
 
     return df
 
@@ -354,7 +338,7 @@ class Model:
                      It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
         """
         self.__check_columns(columns)
-        self.dates = self.__save_dates(df)
+        # self.dates = self.__save_dates(df)
         self.columns = columns
 
         rmse_list_train = []
@@ -369,6 +353,7 @@ class Model:
         df = self.__kmeans_split(df, "outer_area")
         # for each outer fold:
         for outer_split in df["outer_area"].unique():
+            print("Spatial CV, outer split: ", outer_split)
             # define only train set (to be used in inner loop of nested cross-validation)
             train = df[df["outer_area"] != outer_split]
             # split the data into inner folds:
@@ -389,7 +374,7 @@ class Model:
             test_y_predicted = regressor.predict(test_X)
 
             train_y_predicted = np.exp(train_y_predicted)
-            test_y_predicted = np.exp(train_y_predicted)
+            test_y_predicted = np.exp(test_y_predicted)
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
@@ -410,6 +395,7 @@ class Model:
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
         for split in df["final_split_areas"].unique():
+            print("Spatial CV, final split: ", split)
             final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name="final_split_areas")
         # fit final model:
         self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])

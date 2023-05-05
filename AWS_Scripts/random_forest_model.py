@@ -9,26 +9,19 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_extended/"
-
-date_from = "2017-05-01"
-date_to = "2019-07-31"
-
-data = f.import_data(date_from, date_to, df_path)
-data = f.remove_data(data, removeMaskedClouds=True, removeNoMelt=True)
-data = f.data_normalization(data)
-
-columns = data.columns.drop(["date", "row", "col", "opt_value"])
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 rf = f.Model(model=RandomForestRegressor, name="RandomForest")
 hyperparameters_for_grid = {
-    "max_features": ["sqrt", 9, "None"],
-    "sample_size": [0.6, "None"],
+    "max_features": ["sqrt", 9, None],
+    "max_samples": [0.6, None],
     "min_samples_leaf": [2, 5, 10],
     "n_estimators": [300],
 }
 rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)
 
+data = pd.read_parquet(df_path)
+columns = data.columns.drop(["opt_value"])
 rf.spatial_cv(data, columns)
 
 f.save_object(rf)
