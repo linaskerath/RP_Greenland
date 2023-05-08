@@ -13,7 +13,7 @@ from email.message import EmailMessage
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 
-lr = f.Model(model=LinearRegression, name="LinearRegression")
+lr = f.Model(model=LinearRegression, name="LinearRegression_WithoutLog")
 hyperparameters_for_grid = {"fit_intercept": [True]}
 lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
 

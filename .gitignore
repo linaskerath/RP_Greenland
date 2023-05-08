@@ -5,5 +5,4 @@ Data/*
 !Data/results_2022
 !Data/results_2023
 Models_Testing/*
-Models/*
 Scripts/__pycache__
