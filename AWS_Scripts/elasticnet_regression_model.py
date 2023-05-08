@@ -16,7 +16,7 @@ elasticnet.hyperparameters = elasticnet.create_hyperparameter_grid(hyperparamete
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-elasticnet.spatial_cv(data, columns)
+elasticnet.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(elasticnet)
 

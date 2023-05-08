@@ -5,8 +5,9 @@ This script contains all necessary functions for the training pipeline.
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-#import polars as pl
-#import pyarrow
+
+# import polars as pl
+# import pyarrow
 import matplotlib.pyplot as plt
 import pickle
 
@@ -324,7 +325,7 @@ class Model:
                 print(f"Column {col} should not be included")
                 assert False
 
-    def spatial_cv(self, df, columns):
+    def spatial_cv(self, df, columns, target_normalized):
         """
         This function performs spatial cross-validation.
 
@@ -332,6 +333,8 @@ class Model:
             df (pandas.DataFrame): Dataframe with data (should include all columns, both used and not).
 
             columns (list): List with column names to be used in the model.
+
+            target_normalized (bool): If True, the target variable is normalized and will be transformed back.
 
         Returns:
             Nothing. But it assigns the RMSE and R2 scores for the train and test set to the model object.
@@ -373,8 +376,9 @@ class Model:
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
 
-            train_y_predicted = np.exp(train_y_predicted) - 1
-            test_y_predicted = np.exp(test_y_predicted) - 1
+            if target_normalized:
+                train_y_predicted = np.exp(train_y_predicted) - 1
+                test_y_predicted = np.exp(test_y_predicted) - 1
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))

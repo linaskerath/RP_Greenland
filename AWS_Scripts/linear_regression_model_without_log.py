@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.linear_model import LinearRegression
 
 pd.options.mode.chained_assignment = None
@@ -17,8 +18,10 @@ hyperparameters_for_grid = {"fit_intercept": [True]}
 lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
+# transform target variable back to original scale
+data["opt_value"] = np.exp(data["opt_value"]) - 1
 columns = data.columns.drop(["opt_value"])
-lr.spatial_cv(data, columns, target_normalized=True)
+lr.spatial_cv(data, columns, target_normalized=False)
 
 f.save_object(lr)
 

@@ -1,6 +1,6 @@
 AWS_Scripts/config.ini
 AWS_Scripts/__pycache__
-AWS_Data/*
+AWS_Data/Data/*
 Data/*
 !Data/results_2022
 !Data/results_2023

@@ -17,7 +17,7 @@ ridge.hyperparameters = ridge.create_hyperparameter_grid(hyperparameters_for_gri
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-ridge.spatial_cv(data, columns)
+ridge.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(ridge)
 

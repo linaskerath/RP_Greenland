@@ -17,7 +17,7 @@ xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-xgb.spatial_cv(data, columns)
+xgb.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(xgb)
 

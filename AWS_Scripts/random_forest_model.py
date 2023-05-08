@@ -17,12 +17,14 @@ hyperparameters_for_grid = {
     "max_samples": [0.6, None],
     "min_samples_leaf": [2, 5, 10],
     "n_estimators": [300],
+    "n_jobs": [-1],
+    "warm_start": [True],
 }
 rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-rf.spatial_cv(data, columns)
+rf.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(rf)
 

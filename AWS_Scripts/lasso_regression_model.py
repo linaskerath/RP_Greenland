@@ -17,7 +17,7 @@ lasso.hyperparameters = lasso.create_hyperparameter_grid(hyperparameters_for_gri
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-lasso.spatial_cv(data, columns)
+lasso.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(lasso)
 

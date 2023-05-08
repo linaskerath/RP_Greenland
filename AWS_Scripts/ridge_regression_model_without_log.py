@@ -1,5 +1,6 @@
 import pandas as pd
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+import numpy as np
 
 pd.options.mode.chained_assignment = None
 
@@ -11,16 +12,18 @@ from email.message import EmailMessage
 
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
-
-lr = f.Model(model=LinearRegression, name="LinearRegression")
-hyperparameters_for_grid = {"fit_intercept": [True]}
-lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
+ridge = f.Model(model=Ridge, name="RidgeRegression_WithoutLog")
+# chose only best hyperparameter
+hyperparameters_for_grid = {"alpha": [20]}
+ridge.hyperparameters = ridge.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
+# transform target variable back to original scale
+data["opt_value"] = np.exp(data["opt_value"]) - 1
 columns = data.columns.drop(["opt_value"])
-lr.spatial_cv(data, columns, target_normalized=True)
+ridge.spatial_cv(data, columns, target_normalized=False)
 
-f.save_object(lr)
+f.save_object(ridge)
 
 
 # Read email credentials from config file
