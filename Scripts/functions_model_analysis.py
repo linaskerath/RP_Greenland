@@ -6,7 +6,27 @@ import pandas as pd
 from tqdm import tqdm
 import numpy as np
 import rasterio
+import pickle
 import matplotlib.pyplot as plt  # to plot kmeans splits
+
+
+def load_object(filename):
+    """
+    This function loads an object from a pickle file.
+
+    Args:
+        filename (str): Name of the file to be loaded, with extension, without path unless a subfolder is desired.
+
+    Returns:
+            obj (object): Loaded object.
+    """
+    filename = r"../Models/" + filename + ".pkl"
+    with open(filename, "rb") as inp:
+        obj = pickle.load(inp)
+    return obj
+
+
+
 
 #############################################
 # Model comparisons:

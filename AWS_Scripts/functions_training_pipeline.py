@@ -5,8 +5,10 @@ This script contains all necessary functions for the training pipeline.
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-import polars as pl
-import pyarrow
+#import polars as pl
+#import pyarrow
+import matplotlib.pyplot as plt
+import pickle
 
 from sklearn.cluster import KMeans
 from sklearn.metrics import mean_squared_error, r2_score
@@ -196,8 +198,6 @@ def model_mwBenchmark(X_test):
 #############################################
 # Model training CV
 #############################################
-import matplotlib.pyplot as plt
-import pickle
 
 
 class Model:
