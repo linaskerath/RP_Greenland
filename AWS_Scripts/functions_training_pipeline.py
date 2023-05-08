@@ -373,8 +373,8 @@ class Model:
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
 
-            train_y_predicted = np.exp(train_y_predicted)
-            test_y_predicted = np.exp(test_y_predicted)
+            train_y_predicted = np.exp(train_y_predicted) - 1
+            test_y_predicted = np.exp(test_y_predicted) - 1
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
@@ -425,8 +425,8 @@ class Model:
 
             self.cv_mean_list.append(mean_)
 
-            train_y_predicted = np.exp(train_y_predicted)
-            test_y_predicted = np.exp(test_y_predicted)
+            train_y_predicted = np.exp(train_y_predicted) - 1
+            test_y_predicted = np.exp(test_y_predicted) - 1
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted))
