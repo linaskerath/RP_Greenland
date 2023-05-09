@@ -1,5 +1,5 @@
 import pandas as pd
-from sklearn.linear_model import Ridge
+from sklearn.tree import DecisionTreeRegressor
 
 pd.options.mode.chained_assignment = None
 
@@ -11,15 +11,20 @@ from email.message import EmailMessage
 
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
-ridge = f.Model(model=Ridge, name="RidgeRegression")
-hyperparameters_for_grid = {"alpha": [15, 20, 30, 40, 50]}
-ridge.hyperparameters = ridge.create_hyperparameter_grid(hyperparameters_for_grid)
+dt = f.Model(model=DecisionTreeRegressor, name="DecisionTree")
+hyperparameters_for_grid = {
+    "max_depth": [3, 10, None],
+    "min_samples_split": [2, 10],
+    "min_samples_leaf": [1, 4],
+    "max_features": ["auto", None],
+}
+dt.hyperparameters = dt.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-ridge.spatial_cv(data, columns, target_normalized=True)
+dt.spatial_cv(data, columns, target_normalized=True)
 
-f.save_object(ridge)
+f.save_object(dt)
 
 
 # Read email credentials from config file

@@ -12,7 +12,7 @@ from email.message import EmailMessage
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
 lasso = f.Model(model=Lasso, name="LassoRegression")
-hyperparameters_for_grid = {"alpha": [0.5, 1, 2, 5, 10, 20]}
+hyperparameters_for_grid = {"alpha": [0.01, 0.05, 0.1, 0.15, 0.25]}
 lasso.hyperparameters = lasso.create_hyperparameter_grid(hyperparameters_for_grid)
 
 data = pd.read_parquet(df_path)
