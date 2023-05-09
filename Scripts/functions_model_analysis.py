@@ -7,7 +7,16 @@ from tqdm import tqdm
 import numpy as np
 import rasterio
 import pickle
-import matplotlib.pyplot as plt  # to plot kmeans splits
+import matplotlib.pyplot as plt
+
+# for feature importance:
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import ElasticNet
+from sklearn.ensemble import GradientBoostingRegressor
 
 
 def load_object(filename):
@@ -181,3 +190,71 @@ def convert_to_tif(data, path_out):
     with rasterio.open(path_out, "w", **kwargs1) as dst:
         dst.write_band(1, data)  # numpy array or xarray
     return
+
+#############################################
+# Feature importance:
+#############################################
+
+def feature_importance_dict(model, columns):
+    """
+    Function to plot feature importance.
+    """
+    # columns = model.columns
+    # model = model.cv_model_list[0]
+
+    if isinstance(model, DecisionTreeRegressor):
+        feature_importance = model.feature_importances_
+    elif isinstance(model, RandomForestRegressor):
+        feature_importance = model.feature_importances_
+    elif isinstance(model, GradientBoostingRegressor):
+        feature_importance = model.feature_importances_
+    elif isinstance(model, LinearRegression):
+        feature_importance = model.coef_
+    elif isinstance(model, Ridge):
+        feature_importance = np.abs(model.coef_)
+    elif isinstance(model, Lasso):
+        feature_importance = np.abs(model.coef_)
+    elif isinstance(model, ElasticNet):
+        feature_importance = np.abs(model.coef_)
+    else:
+        print("model not supported")
+        assert False
+    feature_importance_dict = dict(zip(columns, feature_importance))
+    return feature_importance_dict
+
+
+def plot_feature_importance(model):
+    """ Plot mean feature importance over 5 cv models with std.
+    """
+    feature_importance_df = []
+    for mod in model.cv_model_list:
+        feature_importance = feature_importance_dict(mod, model.columns)
+        if len(feature_importance_df) == 0:
+            feature_importance_df = pd.DataFrame(feature_importance, index=[0])
+        else:
+            feature_importance_df = pd.concat([feature_importance_df, pd.DataFrame([feature_importance])], ignore_index=True)
+
+    # sort features by mean importance in descending order by absolute value
+    mean_importances = feature_importance_df.mean()
+    mean_importances_abs = np.abs(mean_importances)
+    sorted_index = mean_importances_abs.sort_values(ascending=False).index
+    mean_importances = mean_importances[sorted_index]
+    feature_names = mean_importances.index
+
+    # assign colors to positive and negative features
+    colors = ['red' if imp < 0 else 'green' for imp in mean_importances]
+
+    # plot mean feature importance as bar plot with std
+    fig, ax = plt.subplots()
+    ax.bar(feature_names, mean_importances, yerr=feature_importance_df[sorted_index].std(), capsize=5, color=colors)
+    ax.set_xlabel('Feature')
+    ax.set_ylabel('Mean Importance')
+    ax.set_title('Feature Importance')
+    ax.tick_params(axis='x', rotation=90)
+
+    plt.show()
+
+
+    ############
+    # to get model params:
+    # model.cv_model_list[0].get_params()
