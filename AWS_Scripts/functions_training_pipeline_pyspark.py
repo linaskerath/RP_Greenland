@@ -16,11 +16,19 @@ class Model:
         self.name = name
 
     def create_hyperparameter_grid(self, hyperparameters):
+        # # create a ParamGridBuilder object
+        # param_grid = ParamGridBuilder()
+        # # add hyperparameters and their possible values to the grid
+        # for hyperparam, values in hyperparameters.items():
+        #     param_grid = param_grid.addGrid(hyperparam, values)
+        # # build the grid of hyperparameters
+        # hyperparameters_grid = param_grid.build()
+        # return hyperparameters_grid
         return ParamGridBuilder().build()
 
     def __kmeans_split(self, df, split_variable_name, plot=False, verbose=False):
         kmeans = KMeans(k=5, seed=0).fit(df.select("x", "y"))
-        df = df.withColumn(split_variable_name, kmeans.transform(df.select("x", "y")))
+        df = df.withColumn(split_variable_name, kmeans.transform(df.select("x", "y")).select("prediction")) # not sure about select prediction
 
         if verbose:
             df.groupBy(split_variable_name).count().show()
@@ -97,7 +105,9 @@ class Model:
         df = self.__kmeans_split(df, "outer_area")
 
         # Create a SparkSession
-        spark = SparkSession.builder.getOrCreate()
+        #spark = SparkSession.builder.getOrCreate()
+
+        # df_spark = spark.createDataFrame(df)
 
         # For each outer fold
         for outer_split in df.select("outer_area").distinct().rdd.flatMap(lambda x: x).collect():

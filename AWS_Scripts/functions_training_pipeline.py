@@ -45,11 +45,13 @@ def import_data(date_from: str, date_to: str, df_path: str):
         # print(melt_date)
         try:  # bc some days are empty
             file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            print(len(file))
             # drop columns row, col, date as not needed
             file = file.drop(columns=["row", "col", "date"], axis=1)
+            print(len(file))
             # remove masked data, data with no melt and data with little melt (less than 10% of the time)
             file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
-
+            print(len(file))
             df = pd.concat([df, file], axis=0)
         except:
             continue
@@ -87,8 +89,10 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df = df[df["opt_value"] != -1]
 
     if removeNoMelt and removeLittleMelt:
-        melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt_noMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        #melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt_littleMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        #melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
 
         df = df.merge(melt_noMelt, how="left", on=["y", "x"])
         df = df.merge(melt_littleMelt, how="left", on=["y", "x"])
@@ -97,13 +101,15 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df.drop(["melt_x", "melt_y"], axis=1, inplace=True)
 
     elif removeNoMelt:
-        melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        #melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt = pd.read_parquet(r"../AWS_Data/split_indexes/noMelt_indexes.parquet")
         df = df.merge(melt, how="left", on=["y", "x"])
         df = df[df["melt"] == 1]
         df.pop("melt")
 
     elif removeLittleMelt:
-        melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        #melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt = pd.read_parquet(r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
         df = df.merge(melt, how="left", on=["y", "x"])
         df = df[df["melt"] == 1]
         df.pop("melt")
