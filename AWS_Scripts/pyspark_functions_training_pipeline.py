@@ -1,20 +1,15 @@
-"""
-This script contains all necessary functions for the training pipeline.
-"""
-
-import pandas as pd
-from tqdm import tqdm
+from datetime import datetime, timedelta
 import numpy as np
-
-# import polars as pl
-# import pyarrow
-import matplotlib.pyplot as plt
+import pandas as pd
 import pickle
 
-from sklearn.cluster import KMeans
-from sklearn.metrics import mean_squared_error, r2_score
-import matplotlib.pyplot as plt  # to plot kmeans splits
-from sklearn.model_selection import ParameterGrid
+from pyspark.sql import SparkSession
+from pyspark.ml.tuning import ParamGridBuilder
+from pyspark.ml.param import Param
+from pyspark.ml.clustering import KMeans
+from pyspark.ml.feature import VectorAssembler
+from pyspark.sql.functions import col, exp, log
+from pyspark.ml.evaluation import RegressionEvaluator
 
 
 #############################################
@@ -28,40 +23,38 @@ def import_data(date_from: str, date_to: str, df_path: str):
 
     Args:
         date_from (format: 'yyyy-mm-dd'): Period starting date (included).
-
         date_to (format: 'yyyy-mm-dd'): Period end date (included).
-
         df_path: Path to folder with daily data files.
 
     Returns:
-        pandas.DataFrame: Dataframe with all merged data.
+        pyspark.sql.DataFrame: Dataframe with all merged data.
     """
 
-    date_range = pd.date_range(date_from, date_to)  # both ends included
-    date_range = [str(day.date()) for day in date_range]
-    df = pd.DataFrame()
+    # Initialize SparkSession
+    spark = SparkSession.builder.getOrCreate()
 
-    for melt_date in tqdm(date_range):
-        # print(melt_date)
-        try:  # bc some days are empty
-            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
-            print(len(file))
-            # drop columns row, col, date as not needed
-            file = file.drop(columns=["row", "col", "date"], axis=1)
-            print(len(file))
-            # remove masked data, data with no melt and data with little melt (less than 10% of the time)
-            file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
-            print(len(file))
-            df = pd.concat([df, file], axis=0)
-        except:
-            continue
+    # Create date range
+    start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+    end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+    date_range = [str(start_date + timedelta(days=x)) for x in range((end_date - start_date).days + 1)]
 
-    # df = df.to_pandas()
+    dfs = []
+    for melt_date in date_range:
+        print(melt_date)
+        # try:
+        file = spark.read.parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+        file = file.drop("row", "col", "date")
+        file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
+        dfs.append(file)
+        # except:
+        #    continue
+
+    # Merge dataframes
+    df = dfs[0]
+    for i in range(1, len(dfs)):
+        df = df.union(dfs[i])
 
     return df
-
-
-import pandas as pd
 
 
 def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True):
@@ -84,35 +77,38 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
     Returns:
         pandas.DataFrame: The same dataframe with removed water (and masked data).
     """
+    spark = SparkSession.builder.getOrCreate()
 
     if removeMaskedClouds:
-        df = df[df["opt_value"] != -1]
+        df = df.filter(col("opt_value") != -1)
 
     if removeNoMelt and removeLittleMelt:
-        melt_noMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        # melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt_littleMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt_noMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        # melt_noMelt = spark.read.parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt_littleMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
         # melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
 
-        df = df.merge(melt_noMelt, how="left", on=["y", "x"])
-        df = df.merge(melt_littleMelt, how="left", on=["y", "x"])
+        df = df.join(melt_noMelt, on=["y", "x"], how="left")
+        # rename melt column to melt_noMelt
+        df = df.withColumnRenamed("melt", "melt_noMelt")
+        df = df.join(melt_littleMelt, on=["y", "x"], how="left")
 
-        df = df[(df["melt_x"] == 1) & (df["melt_y"] == 1)]
-        df.drop(["melt_x", "melt_y"], axis=1, inplace=True)
+        df = df.filter((col("melt_noMelt") == 1) & (col("melt") == 1))
+        df = df.drop("melt_noMelt", "melt")
 
     elif removeNoMelt:
         # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt = pd.read_parquet(r"../AWS_Data/split_indexes/noMelt_indexes.parquet")
-        df = df.merge(melt, how="left", on=["y", "x"])
-        df = df[df["melt"] == 1]
-        df.pop("melt")
+        melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        df = df.join(melt, on=["y", "x"], how="left")
+        df = df.filter(col("melt") == 1)
+        df = df.drop("melt")
 
     elif removeLittleMelt:
         # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        melt = pd.read_parquet(r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        df = df.merge(melt, how="left", on=["y", "x"])
-        df = df[df["melt"] == 1]
-        df.pop("melt")
+        melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        df = df.join(melt, on=["y", "x"], how="left")
+        df = df.filter(col("melt") == 1)
+        df = df.drop("melt")
 
     return df
 
@@ -148,40 +144,33 @@ def data_normalization(df):
 
     for feature in features:
         if feature in minmax_features:
-            # if feature == "col":
-            #     min, max = 0, 1461
-            # elif feature == "row":
-            #     min, max = 0, 2662
             if feature == "x":
-                min, max = -636500.0, 824500.0
+                min_val, max_val = -636500.0, 824500.0
             elif feature == "y":
-                min, max = -3324500.0, -662500.0
+                min_val, max_val = -3324500.0, -662500.0
             elif feature == "mean_3":
-                min, max = 0, 1
+                min_val, max_val = 0, 1
             elif feature == "mean_9":
-                min, max = 0, 1
+                min_val, max_val = 0, 1
             elif feature == "sum_5":
-                min, max = 0, 25
-            elif feature == "mw_value_yesterday":
-                min, max = 0, 1
+                min_val, max_val = 0, 25
             elif feature == "mw_value_7_day_average":
-                min, max = 0, 1
+                min_val, max_val = 0, 1
             elif feature == "hours_of_daylight":
-                min, max = 0, 24
+                min_val, max_val = 0, 24
             elif feature == "slope_data":
-                min, max = 0, 90
+                min_val, max_val = 0, 90
             elif feature == "aspect_data":
-                min, max = -1, 1
+                min_val, max_val = -1, 1
             elif feature == "elevation_data":
-                min, max = 0, 3694
+                min_val, max_val = 0, 3694
             else:
-                min, max = 1, 500
+                min_val, max_val = 1, 500
 
-            df[feature] = (df[feature] - min) / (max - min)
+            df = df.withColumn(feature, (col(feature) - min_val) / (max_val - min_val))
 
         elif feature in log_feature:
-            # add a constant to avoid log(0)
-            df[feature] = np.log(1 + df[feature])
+            df = df.withColumn(feature, log(1 + col(feature)))
         else:
             print(f"Not applicable for feature'{feature}'.")
 
@@ -252,58 +241,78 @@ class Model:
         Returns:
             list: List of dictionaries with hyperparameters.
         """
-        return list(ParameterGrid(hyperparameters))
+        param_grid = ParamGridBuilder()
+        for param_name, param_values in hyperparameters.items():
+            param = Param(self.model, param_name, "")
+            param_grid = param_grid.addGrid(param, param_values)
+        return param_grid.build()
 
     def __kmeans_split(self, df, split_variable_name, plot=False, verbose=False):
         """
         This function splits the data into 5 areas based on the kmeans algorithm.
 
         Args:
-            df (pandas.DataFrame): Dataframe with data.
+            df (DataFrame): DataFrame with data.
 
-            split_variable_name (str): name for the column with the kmeans split. Eg. 'inner_area' or 'outer_area' loop.
+            split_variable_name (str): Name for the column with the k-means split. Eg. 'inner_area' or 'outer_area' loop.
 
-            plot (bool): If True, plots the kmeans split.
+            plot (bool): If True, plots the k-means split.
 
             verbose (bool): If True, prints the number of observations in each split.
 
         Returns:
-            pandas.DataFrame: Dataframe with added column with kmeans split.
+            DataFrame: DataFrame with added column with k-means split.
         """
-        kmeans = KMeans(n_clusters=5, n_init="auto").fit(df[["x", "y"]])  #  random_state=0,
-        df[split_variable_name] = kmeans.labels_
+        kmeans = KMeans(k=2, seed=0)  # TODO: change k to 5
+        assembler = VectorAssembler(inputCols=["x", "y"], outputCol="features")
+        df = assembler.transform(df)
 
-        if verbose == True:
-            print(df[split_variable_name].value_counts())
+        model = kmeans.fit(df.select("features"))
+        df = model.transform(df)
 
-        if plot == True:
-            plt.scatter(df["x"], df["y"], c=df[split_variable_name], edgecolor="none", s=0.05)
+        df = df.withColumnRenamed("prediction", split_variable_name)
+        df = df.drop("features")
+
+        if verbose:
+            df.groupBy(split_variable_name).count().show()
+
+        if plot:
+            import matplotlib.pyplot as plt
+
+            pdf = df.select("x", "y", split_variable_name).toPandas()
+            plt.scatter(pdf["x"], pdf["y"], c=pdf[split_variable_name], edgecolor="none", s=0.05)
             plt.show()
+
         return df
 
     def __train_test_split(self, df, columns, split_variable_name, split_index):
         """
-        This function splits the data into train and test set.
+        This function splits the data into train and test sets.
 
         Args:
-            df (pandas.DataFrame): Dataframe with data.
+            df (DataFrame): DataFrame with data.
 
             columns (list): List with column names to be used in the model.
 
-            split_variable_name (str): name of column with kmeans split.
+            split_variable_name (str): Name of the column with the split variable.
 
             split_index (int): Index of the split (loop).
 
         Returns:
-            pandas.DataFrame: Dataframe with added column with kmeans split.
+            DataFrame, DataFrame, DataFrame, DataFrame: Train and test sets for features and target.
         """
-        train = df[df[split_variable_name] != split_index]
-        test = df[df[split_variable_name] == split_index]
-        train_X = train[columns]
-        train_y = train["opt_value"].values.ravel()
-        test_X = test[columns]
-        test_y = test["opt_value"].values.ravel()
-        return train_X, train_y, test_X, test_y
+        train = df.filter(col(split_variable_name) != split_index)
+        test = df.filter(col(split_variable_name) == split_index)
+
+        assembler = VectorAssembler(inputCols=columns, outputCol="features")
+
+        train_data = assembler.transform(train.select(columns)).select(col("features")).join(train.select("opt_value"))
+        train_data = train_data.withColumnRenamed("opt_value", "label")
+
+        test_data = assembler.transform(test.select(columns)).select(col("features")).join(test.select("opt_value"))
+        test_data = test_data.withColumnRenamed("opt_value", "label")
+
+        return train_data, test_data
 
     def __tune_hyperparameters(self, df, columns, split_variable_name):
         """
@@ -320,47 +329,48 @@ class Model:
             dict: Dictionary with best hyperparameters.
         """
         all_hyperparameter_scores = []
-        for split in df[split_variable_name].unique():
-            train_X, train_y, test_X, test_y = self.__train_test_split(df, columns, split_variable_name, split)
+        unique_splits = df.select(split_variable_name).distinct().collect()
+        for row in unique_splits:
+            split = row[split_variable_name]
+            if split_variable_name == "inner_area":
+                print("Inner Split: ", split)
+            else:
+                print("Final Split: ", split)
+            train_data, test_data = self.__train_test_split(df, columns, split_variable_name, split)
+
             one_loop_hyperparameter_scores = []
             if isinstance(self.hyperparameters, list):
-                for hyperparams in self.hyperparameters:
-                    regressor = self.model(**hyperparams).fit(train_X, train_y)
-                    y_predicted_test = regressor.predict(test_X)
-                    one_loop_hyperparameter_scores.append(mean_squared_error(test_y, y_predicted_test))
+                # Set the parameters in the model
+                for param_dict in self.hyperparameters:
+                    for param, value in param_dict.items():
+                        name = param.name
+                        self.model.setParams(**{name: value})
+                    # Fit the model
+                    regressor = self.model.fit(train_data)
+                    # Predict
+                    y_predicted_test = regressor.transform(test_data.select("features")).select("prediction")
+                    # Calculate and append MSE
+                    evaluator = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="mse")
+                    mse = evaluator.evaluate(y_predicted_test.join(test_data.select("label")))
+                    one_loop_hyperparameter_scores.append(mse)
             else:
                 print("hyperparameters must be a list")
             all_hyperparameter_scores.append(one_loop_hyperparameter_scores)
         mean_hyperparameters = np.mean(all_hyperparameter_scores, axis=0)
-        best_hyperparameters = self.hyperparameters[
-            np.argmin(mean_hyperparameters)
-        ]  # not argmax because we want to minimize the error
+        best_hyperparameters = self.hyperparameters[np.argmin(mean_hyperparameters)]
         return best_hyperparameters
-
-    def __save_dates(self, df):
-        """
-        This function saves the dates of the train and test set.
-
-        Args:
-            df (pandas.DataFrame): Dataframe with data.
-
-        Returns:
-            list of dates used in training/cv.
-        """
-        return list((df["date"].min(), df["date"].max()))
 
     def __check_columns(self, columns):
         for col in columns:
             if col in ["row", "col", "date", "opt_value"]:
-                print(f"Column {col} should not be included")
-                assert False
+                raise ValueError(f"Column {col} should not be included")
 
     def spatial_cv(self, df, columns, target_normalized):
         """
         This function performs spatial cross-validation.
 
         Args:
-            df (pandas.DataFrame): Dataframe with data (should include all columns, both used and not).
+            df (DataFrame): DataFrame with data (should include all columns, both used and not).
 
             columns (list): List with column names to be used in the model.
 
@@ -371,49 +381,60 @@ class Model:
                      It also assigns the best hyperparameters, predicted and real values of each outer split to the model object.
         """
         self.__check_columns(columns)
-        # self.dates = self.__save_dates(df)
         self.columns = columns
 
         rmse_list_train = []
         rmse_list_test = []
         r2_list_train = []
         r2_list_test = []
-        # self.best_hyperparameter_list = []
-        # self.feature_importance_list = []
         self.cv_model_list = []
 
         # split the data into outer folds:
         df = self.__kmeans_split(df, "outer_area")
-        # for each outer fold:
-        for outer_split in df["outer_area"].unique():
-            print("Spatial CV, outer split: ", outer_split)
-            # define only train set (to be used in inner loop of nested cross-validation)
-            train = df[df["outer_area"] != outer_split]
-            # split the data into inner folds:
+        unique_outer_splits = df.select("outer_area").distinct().collect()
+        print("--- Spatial CV ---\n")
+        for row in unique_outer_splits:
+            outer_split = row["outer_area"]
+            print("Outer split: ", outer_split)
+
+            # Define only the train set (to be used in the inner loop of nested cross-validation)
+            train = df.filter(df["outer_area"] != outer_split)
+
+            # Split the data into inner folds
             train = self.__kmeans_split(train, "inner_area")
+
             # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
-            # self.best_hyperparameter_list.append(best_hyperparam)
 
-            # with the best hyperparameters, train the model on the outer fold:
-            train_X, train_y, test_X, test_y = self.__train_test_split(
+            # Define the train and test sets for the outer loop of nested cross-validation
+            train_data, test_data = self.__train_test_split(
                 df, columns, split_variable_name="outer_area", split_index=outer_split
             )
-            regressor = self.model(**best_hyperparam).fit(train_X, train_y)
-            # self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
+            # Set the parameters in the model
+            for param, value in best_hyperparam.items():
+                name = param.name
+                self.model.setParams(**{name: value})
+            # Fit the model
+            regressor = self.model.fit(train_data)
+
             self.cv_model_list.append(regressor)
 
-            train_y_predicted = regressor.predict(train_X)
-            test_y_predicted = regressor.predict(test_X)
+            train_y_predicted = regressor.transform(train_data.select("features")).select("prediction")
+            test_y_predicted = regressor.transform(test_data.select("features")).select("prediction")
 
             if target_normalized:
-                train_y_predicted = np.exp(train_y_predicted) - 1
-                test_y_predicted = np.exp(test_y_predicted) - 1
+                train_y_predicted = train_y_predicted.withColumn("prediction", exp(col("prediction")) - 1)
+                test_y_predicted = test_y_predicted.withColumn("prediction", exp(col("prediction")) - 1)
 
-            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted), squared=False)
-            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted), squared=False)
-            r2_list_train.append(r2_score(train_y, train_y_predicted))
-            r2_list_test.append(r2_score(test_y, test_y_predicted))
+            evaluator_rmse = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="rmse")
+            rmse_list_train.append(evaluator_rmse.evaluate(train_y_predicted.join(train_data.select("label"))))
+            rmse_list_test.append(evaluator_rmse.evaluate(test_y_predicted.join(test_data.select("label"))))
+
+            evaluator_r2 = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="r2")
+            r2_list_train.append(evaluator_rmse.evaluate(train_y_predicted.join(train_data.select("label"))))
+            r2_list_test.append(evaluator_rmse.evaluate(test_y_predicted.join(test_data.select("label"))))
+
+            print()
 
         # results:
         self.rmse_train = np.mean(rmse_list_train)
@@ -428,15 +449,20 @@ class Model:
         # find best hyperparameters in for the WHOLE dataset (instaed of only one fold at a time):
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
-        # for split in df["final_split_areas"].unique():
-        #    print("Spatial CV, final split: ", split)
         final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name="final_split_areas")
-        # fit final model:
-        self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
-        # self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
+        # Set the parameters in the final model
+        for param, value in final_hyperparameters.items():
+            name = param.name
+            self.model.setParams(**{name: value})
+        # Fit final model
+        assembler = VectorAssembler(inputCols=columns, outputCol="features")
+        final_train_data = assembler.transform(df).select(col("features"), col("opt_value"))
+        final_train_data = final_train_data.withColumnRenamed("opt_value", "label")
+        self.final_model = self.model.fit(final_train_data)
 
         return
 
+    """ # TODO: DOES IT NEED TO BE ADAPTED ?
     def spatial_cv_mean_benchmark(self, df, columns):
         rmse_list_train = []
         rmse_list_test = []
@@ -481,6 +507,7 @@ class Model:
         print(f"Microwave benchmark R2 on test set: {self.r2_test}")
         print(f"Means: {self.cv_mean_list}")
         return
+    """
 
     def get_results(self):
         """

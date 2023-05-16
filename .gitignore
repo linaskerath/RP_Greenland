@@ -4,5 +4,5 @@ AWS_Data/Data/*
 Data/*
 !Data/results_2022
 !Data/results_2023
-Models_Testing/*
+Models_Old/*
 Scripts/__pycache__
