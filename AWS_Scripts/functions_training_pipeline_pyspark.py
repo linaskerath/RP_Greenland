@@ -83,10 +83,10 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df = df.filter(col("opt_value") != -1)
 
     if removeNoMelt and removeLittleMelt:
-        melt_noMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        # melt_noMelt = spark.read.parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt_littleMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        # melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        # melt_noMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt_noMelt = spark.read.parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        # melt_littleMelt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
 
         df = df.join(melt_noMelt, on=["y", "x"], how="left")
         # rename melt column to melt_noMelt
@@ -97,15 +97,15 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df = df.drop("melt_noMelt", "melt")
 
     elif removeNoMelt:
-        # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        # melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
         df = df.join(melt, on=["y", "x"], how="left")
         df = df.filter(col("melt") == 1)
         df = df.drop("melt")
 
     elif removeLittleMelt:
-        # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        # melt = spark.read.parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
         df = df.join(melt, on=["y", "x"], how="left")
         df = df.filter(col("melt") == 1)
         df = df.drop("melt")
@@ -263,15 +263,16 @@ class Model:
         Returns:
             DataFrame: DataFrame with added column with k-means split.
         """
-        kmeans = KMeans(k=2, seed=0)  # TODO: change k to 5
+        kmeans = KMeans(k=5, seed=0)  # TODO: change k to 5
+        print("Transforming data...")
         assembler = VectorAssembler(inputCols=["x", "y"], outputCol="features")
-        df = assembler.transform(df)
+        df = assembler.transform(df).repartition(200).persist()
 
+        print("Fitting KMeans...")
         model = kmeans.fit(df.select("features"))
         df = model.transform(df)
 
-        df = df.withColumnRenamed("prediction", split_variable_name)
-        df = df.drop("features")
+        df = df.withColumnRenamed("prediction", split_variable_name).drop("features")
 
         if verbose:
             df.groupBy(split_variable_name).count().show()
@@ -329,9 +330,11 @@ class Model:
             dict: Dictionary with best hyperparameters.
         """
         all_hyperparameter_scores = []
-        unique_splits = df.select(split_variable_name).distinct().collect()
-        for row in unique_splits:
-            split = row[split_variable_name]
+        # unique_splits = df.select(split_variable_name).distinct().collect()
+        unique_splits = df.select(split_variable_name).distinct().rdd.map(lambda x: x[split_variable_name]).collect()
+        # for row in unique_splits:
+        # split = row[split_variable_name]
+        for split in unique_splits:
             if split_variable_name == "inner_area":
                 print("Inner Split: ", split)
             else:
@@ -390,8 +393,11 @@ class Model:
         self.cv_model_list = []
 
         # split the data into outer folds:
+        print("Kmeans split...")
         df = self.__kmeans_split(df, "outer_area")
         unique_outer_splits = df.select("outer_area").distinct().collect()
+        print("Finding unique outer splits...")
+        # unique_outer_splits = df.select("outer_area").distinct().rdd.map(lambda row: row[0]).collect()
         print("--- Spatial CV ---\n")
         for row in unique_outer_splits:
             outer_split = row["outer_area"]
@@ -456,8 +462,8 @@ class Model:
             self.model.setParams(**{name: value})
         # Fit final model
         assembler = VectorAssembler(inputCols=columns, outputCol="features")
-        final_train_data = assembler.transform(df).select(col("features"), col("opt_value"))
-        final_train_data = final_train_data.withColumnRenamed("opt_value", "label")
+        final_train_data = assembler.transform(df).select(col("features"), col("opt_value").alias("label"))
+        # final_train_data = final_train_data.withColumnRenamed("opt_value", "label")
         self.final_model = self.model.fit(final_train_data)
 
         return

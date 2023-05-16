@@ -1,8 +1,10 @@
 AWS_Scripts/config.ini
 AWS_Scripts/__pycache__
 AWS_Data/Data/*
+AWS_Data/Plots/optical_values.csv
 Data/*
 !Data/results_2022
 !Data/results_2023
 Models_Old/*
 Scripts/__pycache__
+AWS_Testing

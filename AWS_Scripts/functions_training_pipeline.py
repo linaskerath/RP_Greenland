@@ -270,8 +270,10 @@ class Model:
         Returns:
             pandas.DataFrame: Dataframe with added column with kmeans split.
         """
+        print(f"Performing kmeans split on {split_variable_name}...")
         kmeans = KMeans(n_clusters=5, n_init="auto").fit(df[["x", "y"]])  #  random_state=0,
         df[split_variable_name] = kmeans.labels_
+        del kmeans
 
         if verbose == True:
             print(df[split_variable_name].value_counts())
@@ -297,12 +299,18 @@ class Model:
         Returns:
             pandas.DataFrame: Dataframe with added column with kmeans split.
         """
+        print(f"Splitting data into train and test set for {split_variable_name} {split_index}...")
+
         train = df[df[split_variable_name] != split_index]
-        test = df[df[split_variable_name] == split_index]
         train_X = train[columns]
         train_y = train["opt_value"].values.ravel()
+        del train
+
+        test = df[df[split_variable_name] == split_index]
         test_X = test[columns]
         test_y = test["opt_value"].values.ravel()
+        del test
+
         return train_X, train_y, test_X, test_y
 
     def __tune_hyperparameters(self, df, columns, split_variable_name):
@@ -319,8 +327,10 @@ class Model:
         Returns:
             dict: Dictionary with best hyperparameters.
         """
+        print(f"Tuning hyperparameters for {split_variable_name}...")
         all_hyperparameter_scores = []
         for split in df[split_variable_name].unique():
+            print("Spatial CV, inner split: ", split)
             train_X, train_y, test_X, test_y = self.__train_test_split(df, columns, split_variable_name, split)
             one_loop_hyperparameter_scores = []
             if isinstance(self.hyperparameters, list):
@@ -386,6 +396,7 @@ class Model:
         df = self.__kmeans_split(df, "outer_area")
         # for each outer fold:
         for outer_split in df["outer_area"].unique():
+            print()
             print("Spatial CV, outer split: ", outer_split)
             # define only train set (to be used in inner loop of nested cross-validation)
             train = df[df["outer_area"] != outer_split]
@@ -393,6 +404,7 @@ class Model:
             train = self.__kmeans_split(train, "inner_area")
             # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
             best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
+            del train
             # self.best_hyperparameter_list.append(best_hyperparam)
 
             # with the best hyperparameters, train the model on the outer fold:
@@ -405,6 +417,7 @@ class Model:
 
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
+            del train_X, test_X
 
             if target_normalized:
                 train_y_predicted = np.exp(train_y_predicted) - 1
@@ -414,6 +427,7 @@ class Model:
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted), squared=False)
             r2_list_train.append(r2_score(train_y, train_y_predicted))
             r2_list_test.append(r2_score(test_y, test_y_predicted))
+            del train_y, test_py
 
         # results:
         self.rmse_train = np.mean(rmse_list_train)
