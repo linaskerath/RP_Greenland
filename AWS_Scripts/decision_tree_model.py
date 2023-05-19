@@ -9,6 +9,18 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
+import sys
+
+
+# Define a custom stream writer class
+class ConsoleWriter:
+    def write(self, message):
+        sys.__stdout__.write(message)
+        sys.__stdout__.flush()
+
+
+# Replace sys.stdout with the custom writer
+sys.stdout = ConsoleWriter()
 
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 

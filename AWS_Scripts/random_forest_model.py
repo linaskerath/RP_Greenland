@@ -9,22 +9,40 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
+import sys
 
+
+# Define a custom stream writer class
+class ConsoleWriter:
+    def write(self, message):
+        sys.__stdout__.write(message)
+        sys.__stdout__.flush()
+
+
+# Replace sys.stdout with the custom writer
+sys.stdout = ConsoleWriter()
+
+
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data_UPPER_HALF.parquet.gzip"
+
+print("Creating model object...")
 rf = f.Model(model=RandomForestRegressor, name="RandomForest")
 hyperparameters_for_grid = {
-    "max_features": ["sqrt", 9, None],
-    "max_samples": [0.7],  # [0.6, None],
-    "min_samples_leaf": [2, 6],  # [2, 5, 10],
-    "n_estimators": [150],  # [300],
+    # "max_features": ["sqrt", 9, None],
+    # "max_samples": [0.7],  # [0.6, None],
+    # "min_samples_leaf": [2, 6],  # [2, 5, 10],
+    # "n_estimators": [150],  # [300],
     "n_jobs": [-1],
+    "max_depth": [7]
     # "warm_start": [True],
 }
 rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)
 
+print("Reading data...")
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-rf.spatial_cv(data, columns, target_normalized=True)
+print("Starting training...")
+rf.spatial_cv(data, columns, target_normalized=True, tune_hyperparameters=False)
 
 f.save_object(rf)
 

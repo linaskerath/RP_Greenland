@@ -9,15 +9,37 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
+import sys
+
+
+# Define a custom stream writer class
+class ConsoleWriter:
+    def write(self, message):
+        sys.__stdout__.write(message)
+        sys.__stdout__.flush()
+
+
+# Replace sys.stdout with the custom writer
+sys.stdout = ConsoleWriter()
+
+
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data_UPPER_HALF.parquet.gzip"
+
+print("Creating model object...")
 xgb = f.Model(model=GradientBoostingRegressor, name="XGBoost")
-hyperparameters_for_grid = {"min_samples_split": [3, 5], "learning_rate": [0.1, 0.5]}
+hyperparameters_for_grid = {
+    # "min_samples_split": [3, 5],
+    # "learning_rate": [0.1, 0.5],
+    "max_depth": [3]
+}
 xgb.hyperparameters = xgb.create_hyperparameter_grid(hyperparameters_for_grid)
 
+print("Reading data...")
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
-xgb.spatial_cv(data, columns, target_normalized=True)
+print("Starting training...")
+xgb.spatial_cv(data, columns, target_normalized=True, tune_hyperparameters=False)
 
 f.save_object(xgb)
 

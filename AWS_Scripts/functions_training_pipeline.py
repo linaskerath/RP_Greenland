@@ -365,7 +365,7 @@ class Model:
                 print(f"Column {col} should not be included")
                 assert False
 
-    def spatial_cv(self, df, columns, target_normalized):
+    def spatial_cv(self, df, columns, target_normalized, tune_hyperparameters):
         """
         This function performs spatial cross-validation.
 
@@ -375,6 +375,8 @@ class Model:
             columns (list): List with column names to be used in the model.
 
             target_normalized (bool): If True, the target variable is normalized and will be transformed back.
+
+            tune_hyperparameters (bool): If True, hyperparameters will be tuned in the inner loop.
 
         Returns:
             Nothing. But it assigns the RMSE and R2 scores for the train and test set to the model object.
@@ -402,32 +404,40 @@ class Model:
             train = df[df["outer_area"] != outer_split]
             # split the data into inner folds:
             train = self.__kmeans_split(train, "inner_area")
+
             # tune hyperparameters (all inner loops of nested cross-validation are executed in this function):
-            best_hyperparam = self.__tune_hyperparameters(train, columns, split_variable_name="inner_area")
-            del train
+            if tune_hyperparameters:
+                best_hyperparam = self.__tune_hyperparameters(
+                    train, columns, split_variable_name="inner_area"
+                )  # CHANGE BACK FOR OHTER MODELS
+            else:
+                best_hyperparam = self.hyperparameters[0]
+
             # self.best_hyperparameter_list.append(best_hyperparam)
 
             # with the best hyperparameters, train the model on the outer fold:
             train_X, train_y, test_X, test_y = self.__train_test_split(
                 df, columns, split_variable_name="outer_area", split_index=outer_split
             )
+
+            print("Fit model...")
             regressor = self.model(**best_hyperparam).fit(train_X, train_y)
             # self.feature_importance_list.append(self.get_feature_importance(regressor, columns))
             self.cv_model_list.append(regressor)
 
             train_y_predicted = regressor.predict(train_X)
             test_y_predicted = regressor.predict(test_X)
-            del train_X, test_X
+            del train_X, test_X, regressor
 
             if target_normalized:
                 train_y_predicted = np.exp(train_y_predicted) - 1
                 test_y_predicted = np.exp(test_y_predicted) - 1
 
-            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted), squared=False)
-            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted), squared=False)
+            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted, squared=False))
+            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted, squared=False))
             r2_list_train.append(r2_score(train_y, train_y_predicted))
             r2_list_test.append(r2_score(test_y, test_y_predicted))
-            del train_y, test_py
+            del train_y, test_y, train_y_predicted, test_y_predicted
 
         # results:
         self.rmse_train = np.mean(rmse_list_train)
@@ -442,10 +452,16 @@ class Model:
         # find best hyperparameters in for the WHOLE dataset (instaed of only one fold at a time):
         # (this trained final model is mainly used for feature importance)
         df = self.__kmeans_split(df, "final_split_areas")
-        # for split in df["final_split_areas"].unique():
-        #    print("Spatial CV, final split: ", split)
-        final_hyperparameters = self.__tune_hyperparameters(df, columns, split_variable_name="final_split_areas")
+
+        if tune_hyperparameters:
+            final_hyperparameters = self.__tune_hyperparameters(
+                df, columns, split_variable_name="final_split_areas"
+            )  # CHANGE BACK FOR OHTER MODELS
+        else:
+            final_hyperparameters = self.hyperparameters[0]
+
         # fit final model:
+        print("Fit final model...")
         self.final_model = self.model(**final_hyperparameters).fit(df[columns], df["opt_value"])
         # self.final_feature_importance = self.get_feature_importance(self.final_model, columns)
 
@@ -476,8 +492,8 @@ class Model:
             train_y_predicted = np.exp(train_y_predicted) - 1
             test_y_predicted = np.exp(test_y_predicted) - 1
 
-            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted), squared=False)
-            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted), squared=False)
+            rmse_list_train.append(mean_squared_error(train_y, train_y_predicted, squared=False))
+            rmse_list_test.append(mean_squared_error(test_y, test_y_predicted, squared=False))
             r2_list_train.append(r2_score(train_y, train_y_predicted))
             r2_list_test.append(r2_score(test_y, test_y_predicted))
 
