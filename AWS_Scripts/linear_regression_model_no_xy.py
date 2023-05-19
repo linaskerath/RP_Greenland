@@ -9,16 +9,32 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
-df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
+import sys
 
 
+# Define a custom stream writer class
+class ConsoleWriter:
+    def write(self, message):
+        sys.__stdout__.write(message)
+        sys.__stdout__.flush()
+
+
+# Replace sys.stdout with the custom writer
+sys.stdout = ConsoleWriter()
+
+
+df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data_UPPER_HALF.parquet.gzip"
+
+print("Creating model object...")
 lr = f.Model(model=LinearRegression, name="LinearRegression_NoXY")
 hyperparameters_for_grid = {"fit_intercept": [True]}
 lr.hyperparameters = lr.create_hyperparameter_grid(hyperparameters_for_grid)
 
+print("Reading data...")
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value", "x", "y"])
-lr.spatial_cv(data, columns, target_normalized=True)
+print("Starting training...")
+lr.spatial_cv(data, columns, target_normalized=True, tune_hyperparameters=False)
 
 f.save_object(lr)
 

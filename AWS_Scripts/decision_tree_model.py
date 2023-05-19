@@ -9,19 +9,36 @@ import smtplib
 import configparser
 from email.message import EmailMessage
 
+import sys
+
+
+# Define a custom stream writer class
+class ConsoleWriter:
+    def write(self, message):
+        sys.__stdout__.write(message)
+        sys.__stdout__.flush()
+
+
+# Replace sys.stdout with the custom writer
+sys.stdout = ConsoleWriter()
+
 df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data.parquet.gzip"
 
+print("Creating model object...")
 dt = f.Model(model=DecisionTreeRegressor, name="DecisionTree")
 hyperparameters_for_grid = {
-    "max_depth": [3, 10, None],
-    "min_samples_split": [2, 10],
-    "min_samples_leaf": [1, 4],
-    "max_features": ["auto", None],
+    "max_depth": [12]
+    # "max_depth": [3, 10, None],
+    # "min_samples_split": [2, 10],
+    # "min_samples_leaf": [1, 4],
+    # "max_features": ["auto", None],
 }
 dt.hyperparameters = dt.create_hyperparameter_grid(hyperparameters_for_grid)
 
+print("Reading data...")
 data = pd.read_parquet(df_path)
 columns = data.columns.drop(["opt_value"])
+print("Starting training...")
 dt.spatial_cv(data, columns, target_normalized=True)
 
 f.save_object(dt)
