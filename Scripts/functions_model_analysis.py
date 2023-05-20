@@ -19,6 +19,166 @@ from sklearn.linear_model import ElasticNet
 from sklearn.ensemble import GradientBoostingRegressor
 
 
+def import_data(date_from: str, date_to: str, df_path: str, predict_only: str):
+    """
+    Imports data and merges into one dataframe.
+
+    Args:
+        date_from (format: 'yyyy-mm-dd'): Period starting date (included).
+
+        date_to (format: 'yyyy-mm-dd'): Period end date (included).
+
+        df_path: Path to folder with daily data files.
+
+    Returns:
+        pandas.DataFrame: Dataframe with all merged data.
+    """
+
+    date_range = pd.date_range(date_from, date_to)  # both ends included
+    date_range = [str(day.date()) for day in date_range]
+    df = pd.DataFrame()
+
+    for melt_date in tqdm(date_range):
+        # print(melt_date)
+        try:  # bc some days are empty
+            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            file = file.drop(columns=["date"], axis=1)
+            if not predict_only:
+                # remove masked data, data with no melt and data with little melt (less than 10% of the time)
+                file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
+            df = pd.concat([df, file], axis=0)
+        except:
+            continue
+
+    # df = df.to_pandas()
+
+    return df
+
+
+def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True):
+    """
+    Removes missing/masked mw and opt data from dataframe.
+    Used for training and testing, not predicting.
+
+    Args:
+        df (pandas.DataFrame): Full train/ test dataframe.
+
+        removeMaskedClouds (bool): True for train and test data, removes masked data from opt data.
+                                   False for predicting data, keeps masked opt data.
+
+        removeNoMelt (bool): True for train and test data, removes non-melt areas from mw data.
+                             False for predicting data, keeps non-melt areas.
+
+        removeLittleMelt (bool): True for train and test data, removes areas with little melt from mw data.
+                                 False for predicting data, keeps areas with little melt.
+
+    Returns:
+        pandas.DataFrame: The same dataframe with removed water (and masked data).
+    """
+
+    if removeMaskedClouds:
+        df = df[df["opt_value"] != -1]
+
+    if removeNoMelt and removeLittleMelt:
+        melt_noMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        # melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt_littleMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        # melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+
+        df = df.merge(melt_noMelt, how="left", on=["y", "x"])
+        df = df.merge(melt_littleMelt, how="left", on=["y", "x"])
+
+        df = df[(df["melt_x"] == 1) & (df["melt_y"] == 1)]
+        df.drop(["melt_x", "melt_y"], axis=1, inplace=True)
+
+    elif removeNoMelt:
+        # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt = pd.read_parquet(r"../AWS_Data/split_indexes/noMelt_indexes.parquet")
+        df = df.merge(melt, how="left", on=["y", "x"])
+        df = df[df["melt"] == 1]
+        df.pop("melt")
+
+    elif removeLittleMelt:
+        # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt = pd.read_parquet(r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        df = df.merge(melt, how="left", on=["y", "x"])
+        df = df[df["melt"] == 1]
+        df.pop("melt")
+
+    return df
+
+
+def data_normalization(df):
+    """
+    Normalizes data with min-max (linear) or Z-score normalization depending on feature.
+
+    Args:
+        df (pandas.DataFrame): Full train/ test dataframe.
+
+    Returns:
+        pandas.DataFrame: The same dataframe with normalized features.
+    """
+    features = df.columns
+
+    minmax_features = [
+        # "col",
+        # "row",
+        "x",
+        "y",
+        "mean_3",
+        "mean_9",
+        "sum_5",
+        "mw_value_7_day_average",
+        "hours_of_daylight",
+        "slope_data",
+        "aspect_data",
+        "elevation_data",
+        "distance_to_margin",
+    ]
+    log_feature = ["opt_value"]
+
+    for feature in features:
+        if feature in minmax_features:
+            # if feature == "col":
+            #     min, max = 0, 1461
+            # elif feature == "row":
+            #     min, max = 0, 2662
+            if feature == "x":
+                min, max = -636500.0, 824500.0
+            elif feature == "y":
+                min, max = -3324500.0, -662500.0
+            elif feature == "mean_3":
+                min, max = 0, 1
+            elif feature == "mean_9":
+                min, max = 0, 1
+            elif feature == "sum_5":
+                min, max = 0, 25
+            elif feature == "mw_value_yesterday":
+                min, max = 0, 1
+            elif feature == "mw_value_7_day_average":
+                min, max = 0, 1
+            elif feature == "hours_of_daylight":
+                min, max = 0, 24
+            elif feature == "slope_data":
+                min, max = 0, 90
+            elif feature == "aspect_data":
+                min, max = -1, 1
+            elif feature == "elevation_data":
+                min, max = 0, 3694
+            else:
+                min, max = 1, 500
+
+            df[feature] = (df[feature] - min) / (max - min)
+
+        elif feature in log_feature:
+            # add a constant to avoid log(0)
+            df[feature] = np.log(1 + df[feature])
+        else:
+            print(f"Not applicable for feature'{feature}'.")
+
+    return df
+
+
 def load_object(filename):
     """
     This function loads an object from a pickle file.
@@ -29,12 +189,10 @@ def load_object(filename):
     Returns:
             obj (object): Loaded object.
     """
-    filename = r"../Models/" + filename + ".pkl"
+    filename = r"../Models_v3/" + filename + ".pkl"
     with open(filename, "rb") as inp:
         obj = pickle.load(inp)
     return obj
-
-
 
 
 #############################################
@@ -125,6 +283,10 @@ def mean_predict(model, data):
     for i in range(len(model.cv_model_list)):
         predictions_one_model = model.cv_model_list[i].predict(x_test)
         all_predictions.append(predictions_one_model)
+
+    # transform back from log to normal scale
+    all_predictions = np.exp(all_predictions) - 1
+
     mean_prediction = np.mean(all_predictions, axis=0)
     std_prediction = np.std(all_predictions, axis=0)
     error_prediction = np.abs(mean_prediction - y_test)
@@ -160,10 +322,10 @@ def save_prediction_tif(df_predictions, metric, path_out):
     # original matrix shape:
     nan_matrix = np.full((2663, 1462), np.nan)
 
-    for row in tqdm(df_predictions.iterrows()):  # fix progress bar?
-        row_index = int(row[1]["row"])
-        col_index = int(row[1]["col"])
-        pred_val = row[1][metric + "_prediction"]
+    for _, row in tqdm(df_predictions.iterrows(), total=len(df_predictions)):  # fix progress bar?
+        row_index = int(row["row"])
+        col_index = int(row["col"])
+        pred_val = row[metric + "_prediction"]
         nan_matrix[row_index][col_index] = pred_val
 
     convert_to_tif(nan_matrix, path_out)
@@ -191,9 +353,11 @@ def convert_to_tif(data, path_out):
         dst.write_band(1, data)  # numpy array or xarray
     return
 
+
 #############################################
 # Feature importance:
 #############################################
+
 
 def feature_importance_dict(model, columns):
     """
@@ -224,15 +388,16 @@ def feature_importance_dict(model, columns):
 
 
 def plot_feature_importance(model):
-    """ Plot mean feature importance over 5 cv models with std.
-    """
+    """Plot mean feature importance over 5 cv models with std."""
     feature_importance_df = []
     for mod in model.cv_model_list:
         feature_importance = feature_importance_dict(mod, model.columns)
         if len(feature_importance_df) == 0:
             feature_importance_df = pd.DataFrame(feature_importance, index=[0])
         else:
-            feature_importance_df = pd.concat([feature_importance_df, pd.DataFrame([feature_importance])], ignore_index=True)
+            feature_importance_df = pd.concat(
+                [feature_importance_df, pd.DataFrame([feature_importance])], ignore_index=True
+            )
 
     # sort features by mean importance in descending order by absolute value
     mean_importances = feature_importance_df.mean()
@@ -242,18 +407,17 @@ def plot_feature_importance(model):
     feature_names = mean_importances.index
 
     # assign colors to positive and negative features
-    colors = ['red' if imp < 0 else 'green' for imp in mean_importances]
+    colors = ["red" if imp < 0 else "green" for imp in mean_importances]
 
     # plot mean feature importance as bar plot with std
     fig, ax = plt.subplots()
     ax.bar(feature_names, mean_importances, yerr=feature_importance_df[sorted_index].std(), capsize=5, color=colors)
-    ax.set_xlabel('Feature')
-    ax.set_ylabel('Mean Importance')
-    ax.set_title('Feature Importance')
-    ax.tick_params(axis='x', rotation=90)
+    ax.set_xlabel("Feature")
+    ax.set_ylabel("Mean Importance")
+    ax.set_title("Feature Importance")
+    ax.tick_params(axis="x", rotation=90)
 
     plt.show()
-
 
     ############
     # to get model params:

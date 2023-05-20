@@ -28,12 +28,12 @@ df_path = r"/mnt/volume/AWS_Data/Data/dataframe_model_training/training_data_UPP
 print("Creating model object...")
 rf = f.Model(model=RandomForestRegressor, name="RandomForest")
 hyperparameters_for_grid = {
-    # "max_features": ["sqrt", 9, None],
+    "max_features": ["sqrt", 9, None],
     # "max_samples": [0.7],  # [0.6, None],
-    # "min_samples_leaf": [2, 6],  # [2, 5, 10],
+    "min_samples_leaf": [2, 6],  # [2, 5, 10],
     # "n_estimators": [150],  # [300],
-    "n_jobs": [-1],
-    "max_depth": [7]
+    "max_depth": [7, 12],
+    "n_jobs": [-1]
     # "warm_start": [True],
 }
 rf.hyperparameters = rf.create_hyperparameter_grid(hyperparameters_for_grid)

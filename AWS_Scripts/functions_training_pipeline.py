@@ -22,7 +22,7 @@ from sklearn.model_selection import ParameterGrid
 #############################################
 
 
-def import_data(date_from: str, date_to: str, df_path: str):
+def import_data(date_from: str, date_to: str, df_path: str, predict_only: str):
     """
     Imports data and merges into one dataframe.
 
@@ -45,13 +45,10 @@ def import_data(date_from: str, date_to: str, df_path: str):
         # print(melt_date)
         try:  # bc some days are empty
             file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
-            print(len(file))
             # drop columns row, col, date as not needed
             file = file.drop(columns=["row", "col", "date"], axis=1)
-            print(len(file))
             # remove masked data, data with no melt and data with little melt (less than 10% of the time)
             file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
-            print(len(file))
             df = pd.concat([df, file], axis=0)
         except:
             continue
@@ -467,7 +464,7 @@ class Model:
 
         return
 
-    def spatial_cv_mean_benchmark(self, df, columns):
+    def spatial_cv_mean_benchmark(self, df, columns, target_normalized):
         rmse_list_train = []
         rmse_list_test = []
         r2_list_train = []
@@ -489,8 +486,9 @@ class Model:
 
             self.cv_mean_list.append(mean_)
 
-            train_y_predicted = np.exp(train_y_predicted) - 1
-            test_y_predicted = np.exp(test_y_predicted) - 1
+            if target_normalized:
+                train_y_predicted = np.exp(train_y_predicted) - 1
+                test_y_predicted = np.exp(test_y_predicted) - 1
 
             rmse_list_train.append(mean_squared_error(train_y, train_y_predicted, squared=False))
             rmse_list_test.append(mean_squared_error(test_y, test_y_predicted, squared=False))
@@ -507,9 +505,10 @@ class Model:
         self.r2_test = np.mean(r2_list_test)
         self.r2_std_test = np.std(r2_list_test)
 
-        print(f"Microwave benchmark RMSE on test set: {self.rmse_test}")
-        print(f"Microwave benchmark R2 on test set: {self.r2_test}")
+        print(f"Mean benchmark RMSE on test set: {self.rmse_test}")
+        print(f"Mean benchmark R2 on test set: {self.r2_test}")
         print(f"Means: {self.cv_mean_list}")
+        print(f"Mean: {np.mean(self.cv_mean_list)}")
         return
 
     def get_results(self):
