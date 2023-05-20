@@ -33,6 +33,7 @@ pooch = "^1.7.0"
 seaborn = "^0.12.2"
 scikit-learn = "1.2.2"
 pyspark = "^3.4.0"
+numpy = "1.24.3"
 
 
 [tool.poetry.group.dev.dependencies]
