@@ -41,11 +41,18 @@ def import_data(date_from: str, date_to: str, df_path: str, predict_only: str):
     for melt_date in tqdm(date_range):
         # print(melt_date)
         try:  # bc some days are empty
-            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
+            file = pd.read_parquet(
+                df_path + "melt_" + melt_date + "_extended.parquet.gzip"
+            )
             file = file.drop(columns=["date"], axis=1)
             if not predict_only:
                 # remove masked data, data with no melt and data with little melt (less than 10% of the time)
-                file = remove_data(file, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt=True)
+                file = remove_data(
+                    file,
+                    removeMaskedClouds=True,
+                    removeNoMelt=True,
+                    removeLittleMelt=True,
+                )
             df = pd.concat([df, file], axis=0)
         except:
             continue
@@ -80,9 +87,13 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df = df[df["opt_value"] != -1]
 
     if removeNoMelt and removeLittleMelt:
-        melt_noMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
+        melt_noMelt = pd.read_parquet(
+            r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet"
+        )
         # melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt_littleMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt_littleMelt = pd.read_parquet(
+            r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet"
+        )
         # melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
 
         df = df.merge(melt_noMelt, how="left", on=["y", "x"])
@@ -100,7 +111,9 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
 
     elif removeLittleMelt:
         # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        melt = pd.read_parquet(r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
+        melt = pd.read_parquet(
+            r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet"
+        )
         df = df.merge(melt, how="left", on=["y", "x"])
         df = df[df["melt"] == 1]
         df.pop("melt")
@@ -237,14 +250,38 @@ def model_comparison_plot(model_list, metric="RMSE"):
     test_color = "darkorange"  # Choose a color for the test set bars
     for i, model in enumerate(model_names):
         # Get the train and test metric values for the current model
-        train_val = table[(table["Model"] == model) & (table["Set"] == "Train")][metric].values[0]
-        test_val = table[(table["Model"] == model) & (table["Set"] == "Test")][metric].values[0]
+        train_val = table[(table["Model"] == model) & (table["Set"] == "Train")][
+            metric
+        ].values[0]
+        test_val = table[(table["Model"] == model) & (table["Set"] == "Test")][
+            metric
+        ].values[0]
         # Get the train and test metric standard deviation values for the current model
-        train_val_std = table[(table["Model"] == model) & (table["Set"] == "Train")][metric + "_std"].values[0]
-        test_val_std = table[(table["Model"] == model) & (table["Set"] == "Test")][metric + "_std"].values[0]
+        train_val_std = table[(table["Model"] == model) & (table["Set"] == "Train")][
+            metric + "_std"
+        ].values[0]
+        test_val_std = table[(table["Model"] == model) & (table["Set"] == "Test")][
+            metric + "_std"
+        ].values[0]
         # Create the bar plot
-        ax.bar(i - width / 2, train_val, width, yerr=train_val_std, label=None, capsize=10, color=train_color)
-        ax.bar(i + width / 2, test_val, width, yerr=test_val_std, label=None, capsize=10, color=test_color)
+        ax.bar(
+            i - width / 2,
+            train_val,
+            width,
+            yerr=train_val_std,
+            label=None,
+            capsize=10,
+            color=train_color,
+        )
+        ax.bar(
+            i + width / 2,
+            test_val,
+            width,
+            yerr=test_val_std,
+            label=None,
+            capsize=10,
+            color=test_color,
+        )
 
     # Add the legend
     ax.legend(["Train", "Test"], loc="upper right")
@@ -399,7 +436,8 @@ def plot_feature_importance(model):
             feature_importance_df = pd.DataFrame(feature_importance, index=[0])
         else:
             feature_importance_df = pd.concat(
-                [feature_importance_df, pd.DataFrame([feature_importance])], ignore_index=True
+                [feature_importance_df, pd.DataFrame([feature_importance])],
+                ignore_index=True,
             )
 
     # sort features by mean importance in descending order by absolute value
@@ -409,17 +447,62 @@ def plot_feature_importance(model):
     mean_importances = mean_importances[sorted_index]
     feature_names = mean_importances.index
 
+    """
     # assign colors to positive and negative features
-    colors = ["red" if imp < 0 else "green" for imp in mean_importances]
+    # #9c3605
+    colors = ["firebrick" if imp < 0 else "#fead3a" for imp in mean_importances]
 
     # plot mean feature importance as bar plot with std
     fig, ax = plt.subplots()
-    ax.bar(feature_names, mean_importances, yerr=feature_importance_df[sorted_index].std(), capsize=5, color=colors)
+    ax.bar(
+        feature_names,
+        mean_importances,
+        yerr=feature_importance_df[sorted_index].std(),
+        capsize=5,
+        color=colors,
+    )
     ax.set_xlabel("Feature")
     ax.set_ylabel("Mean Importance")
     ax.set_title("Feature Importance")
     ax.tick_params(axis="x", rotation=90)
 
+    plt.show()
+    """
+
+    # Assign colors to positive and negative features
+    colors = ["firebrick" if imp < 0 else "#fead3a" for imp in mean_importances]
+
+    # Plot mean feature importance as a bar plot with standard deviation
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.bar(
+        feature_names,
+        mean_importances,
+        yerr=feature_importance_df[sorted_index].std(),
+        capsize=5,
+        color=colors,
+    )
+
+    # Set axis labels and title
+    ax.set_xlabel("Feature", fontsize=12)
+    ax.set_ylabel("Mean Importance", fontsize=12)
+    ax.set_title("Feature Importance", fontsize=14)
+
+    # Rotate x-axis labels for better visibility
+    ax.tick_params(axis="x", rotation=90)
+
+    # Set grid lines
+    ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    # Customize spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_linewidth(0.5)
+    ax.spines["bottom"].set_linewidth(0.5)
+
+    # Adjust the plot layout
+    plt.tight_layout()
+
+    # Show the plot
     plt.show()
 
     ############
