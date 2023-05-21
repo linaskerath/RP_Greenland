@@ -290,6 +290,7 @@ def mean_predict(model, data):
     mean_prediction = np.mean(all_predictions, axis=0)
     std_prediction = np.std(all_predictions, axis=0)
     error_prediction = np.abs(mean_prediction - y_test)
+    error_prediction2 = y_test - mean_prediction
     df_results = pd.DataFrame(
         {
             "row": data["row"],
@@ -297,6 +298,7 @@ def mean_predict(model, data):
             "mean_prediction": mean_prediction,
             "std_prediction": std_prediction,
             "error_prediction": error_prediction,
+            "opt_value": y_test,
         }
     )
 
