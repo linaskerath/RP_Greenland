@@ -298,6 +298,7 @@ def mean_predict(model, data):
             "mean_prediction": mean_prediction,
             "std_prediction": std_prediction,
             "error_prediction": error_prediction,
+            "error_prediction2": error_prediction2,
             "opt_value": y_test,
         }
     )
