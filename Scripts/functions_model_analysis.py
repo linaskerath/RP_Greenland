@@ -324,7 +324,7 @@ def save_prediction_tif(df_predictions, metric, path_out):
     # original matrix shape:
     nan_matrix = np.full((2663, 1462), np.nan)
 
-    for _, row in tqdm(df_predictions.iterrows(), total=len(df_predictions)):  # fix progress bar?
+    for _, row in tqdm(df_predictions.iterrows(), total=len(df_predictions)):
         row_index = int(row["row"])
         col_index = int(row["col"])
         pred_val = row[metric + "_prediction"]
