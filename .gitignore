@@ -5,6 +5,8 @@ AWS_Data/Plots/optical_values.csv
 Data/combined
 Data/microwave-rs
 Data/optical-rs
+Data/daylight_data
+Data/elevation_data
 !Data/results_2022
 !Data/results_2023
 Models_Old/*
