@@ -14,7 +14,7 @@ df = pd.read_csv(path_optical_values)
 # cap all values of above 5 to 5
 df["optical_values"] = df["optical_values"].apply(lambda x: 5 if x > 5 else x)
 
-for i in ["Raw", "Log-Transformed"]:
+for i in ["Raw"]:  # , "Log-Transformed"]:
     # Plot the QQ plot
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -35,11 +35,11 @@ for i in ["Raw", "Log-Transformed"]:
     ax.get_lines()[1].set_linewidth(2.0)
 
     # Add title and labels
-    ax.set_title(f"{i} Data", fontsize=20)
-    ax.set_xlabel("Theoretical Quantiles", fontsize=17)
-    ax.set_ylabel("Data Quantiles", fontsize=17)
+    ax.set_title(f"{i} Data", fontsize=14, pad=13)
+    ax.set_xlabel("Theoretical Quantiles", fontsize=12)
+    ax.set_ylabel("Sample Data Quantiles", fontsize=12)
     # increase tick label size
-    ax.tick_params(axis="both", which="major", labelsize=15)
+    ax.tick_params(axis="both", which="major", labelsize=12)
 
     # Save the plot as a PNG file
     fig.savefig(rf"{path_out}/qq_plot_{i}.png", dpi=300, bbox_inches="tight")
