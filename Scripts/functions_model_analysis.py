@@ -307,11 +307,11 @@ def mean_predict(model, data):
 
     # transform back from log to normal scale
     all_predictions = np.exp(all_predictions) - 1
+    y_test_backtransformed = np.exp(y_test) - 1
 
     mean_prediction = np.mean(all_predictions, axis=0)
     std_prediction = np.std(all_predictions, axis=0)
-    error_prediction = np.abs(mean_prediction - y_test)
-    y_test_backtransformed = np.exp(y_test) - 1
+    error_prediction = np.abs(mean_prediction - y_test_backtransformed)
     error_prediction2 = y_test_backtransformed - mean_prediction
     df_results = pd.DataFrame(
         {
