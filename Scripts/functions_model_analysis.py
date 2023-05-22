@@ -41,9 +41,7 @@ def import_data(date_from: str, date_to: str, df_path: str, predict_only: str):
     for melt_date in tqdm(date_range):
         # print(melt_date)
         try:  # bc some days are empty
-            file = pd.read_parquet(
-                df_path + "melt_" + melt_date + "_extended.parquet.gzip"
-            )
+            file = pd.read_parquet(df_path + "melt_" + melt_date + "_extended.parquet.gzip")
             file = file.drop(columns=["date"], axis=1)
             if not predict_only:
                 # remove masked data, data with no melt and data with little melt (less than 10% of the time)
@@ -87,13 +85,9 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
         df = df[df["opt_value"] != -1]
 
     if removeNoMelt and removeLittleMelt:
-        melt_noMelt = pd.read_parquet(
-            r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet"
-        )
+        melt_noMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
         # melt_noMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/noMelt_indexes.parquet")
-        melt_littleMelt = pd.read_parquet(
-            r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet"
-        )
+        melt_littleMelt = pd.read_parquet(r"../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
         # melt_littleMelt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
 
         df = df.merge(melt_noMelt, how="left", on=["y", "x"])
@@ -111,9 +105,7 @@ def remove_data(df, removeMaskedClouds=True, removeNoMelt=True, removeLittleMelt
 
     elif removeLittleMelt:
         # melt = pd.read_parquet(r"/mnt/volume/AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
-        melt = pd.read_parquet(
-            r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet"
-        )
+        melt = pd.read_parquet(r"/../AWS_Data/Data/split_indexes/littleMelt_indexes.parquet")
         df = df.merge(melt, how="left", on=["y", "x"])
         df = df[df["melt"] == 1]
         df.pop("melt")
@@ -250,19 +242,11 @@ def model_comparison_plot(model_list, metric="RMSE"):
     test_color = "darkorange"  # Choose a color for the test set bars
     for i, model in enumerate(model_names):
         # Get the train and test metric values for the current model
-        train_val = table[(table["Model"] == model) & (table["Set"] == "Train")][
-            metric
-        ].values[0]
-        test_val = table[(table["Model"] == model) & (table["Set"] == "Test")][
-            metric
-        ].values[0]
+        train_val = table[(table["Model"] == model) & (table["Set"] == "Train")][metric].values[0]
+        test_val = table[(table["Model"] == model) & (table["Set"] == "Test")][metric].values[0]
         # Get the train and test metric standard deviation values for the current model
-        train_val_std = table[(table["Model"] == model) & (table["Set"] == "Train")][
-            metric + "_std"
-        ].values[0]
-        test_val_std = table[(table["Model"] == model) & (table["Set"] == "Test")][
-            metric + "_std"
-        ].values[0]
+        train_val_std = table[(table["Model"] == model) & (table["Set"] == "Train")][metric + "_std"].values[0]
+        test_val_std = table[(table["Model"] == model) & (table["Set"] == "Test")][metric + "_std"].values[0]
         # Create the bar plot
         ax.bar(
             i - width / 2,
@@ -327,7 +311,8 @@ def mean_predict(model, data):
     mean_prediction = np.mean(all_predictions, axis=0)
     std_prediction = np.std(all_predictions, axis=0)
     error_prediction = np.abs(mean_prediction - y_test)
-    error_prediction2 = y_test - mean_prediction
+    y_test_backtransformed = np.exp(y_test) - 1
+    error_prediction2 = y_test_backtransformed - mean_prediction
     df_results = pd.DataFrame(
         {
             "row": data["row"],
