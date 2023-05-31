@@ -322,6 +322,7 @@ def mean_predict(model, data):
             "error_prediction": error_prediction,
             "residual_prediction": residual_prediction,
             "opt_value": y_test,
+            "opt_value_backtransformed": y_test_backtransformed,
         }
     )
 
